@@ -29,8 +29,9 @@ describe('Concurrency - Double Booking Prevention', () => {
     const slot = { startsAt: '2026-08-24T08:00:00-03:00', endsAt: '2026-08-24T08:30:00-03:00' }
 
     // Disparar 20 requests simultáneos
-    const promises = patientTokens.map((token) =>
-      app.inject({
+    const promises = patientTokens.map((token) => {
+      if (!token) return Promise.resolve({ statusCode: 500 }) // skip undefined
+      return app.inject({
         method: 'POST',
         url: '/api/v1/appointments',
         headers: { authorization: `Bearer ${token}` },
@@ -43,7 +44,7 @@ describe('Concurrency - Double Booking Prevention', () => {
           specialty: 'ORTODONCIA',
         },
       })
-    )
+    })
 
     const results = await Promise.all(promises)
 

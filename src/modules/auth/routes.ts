@@ -4,6 +4,7 @@ import { registerSchema, loginSchema, refreshSchema } from './schemas.js'
 
 export async function authRoutes(fastify: FastifyInstance) {
   const authService = new AuthService(fastify.prisma, fastify)
+  const isProd = process.env.NODE_ENV === 'production'
 
   fastify.post('/register', {
     schema: registerSchema,
@@ -13,12 +14,12 @@ export async function authRoutes(fastify: FastifyInstance) {
       const result = await authService.register(request.body)
       reply.setCookie('refreshToken', result.refreshToken, {
         httpOnly: true,
-        secure: fastify.config.NODE_ENV === 'production',
+        secure: isProd,
         sameSite: 'lax',
         maxAge: 7 * 24 * 60 * 60 * 1000,
         path: '/',
       })
-      return { accessToken: result.accessToken, user: result.user }
+      return reply.code(201).send({ accessToken: result.accessToken, user: result.user })
     } catch (err) {
       if (err.message === 'EMAIL_EXISTS') {
         return reply.code(409).send({ error: 'Email ya registrado' })
@@ -35,7 +36,7 @@ export async function authRoutes(fastify: FastifyInstance) {
       const result = await authService.login(request.body.email, request.body.password)
       reply.setCookie('refreshToken', result.refreshToken, {
         httpOnly: true,
-        secure: fastify.config.NODE_ENV === 'production',
+        secure: isProd,
         sameSite: 'lax',
         maxAge: 7 * 24 * 60 * 60 * 1000,
         path: '/',
@@ -59,7 +60,7 @@ export async function authRoutes(fastify: FastifyInstance) {
       const result = await authService.refresh(refreshToken)
       reply.setCookie('refreshToken', result.refreshToken, {
         httpOnly: true,
-        secure: fastify.config.NODE_ENV === 'production',
+        secure: isProd,
         sameSite: 'lax',
         maxAge: 7 * 24 * 60 * 60 * 1000,
         path: '/',

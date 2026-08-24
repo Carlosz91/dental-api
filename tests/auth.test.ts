@@ -23,7 +23,9 @@ describe('Auth Module', () => {
       expect(body).toHaveProperty('user')
       expect(body.user.email).toBe('newpatient@example.com')
       expect(body.user.role).toBe('PATIENT')
-      expect(res.cookies.refreshToken).toBeDefined()
+      // Verificar cookie en header set-cookie
+      const setCookie = res.headers['set-cookie'] || ''
+      expect(setCookie).toContain('refreshToken=')
     })
 
     it('should reject duplicate email', async () => {
@@ -75,7 +77,9 @@ describe('Auth Module', () => {
       expect(res.statusCode).toBe(200)
       const body = JSON.parse(res.body)
       expect(body.accessToken).toBeDefined()
-      expect(res.cookies.refreshToken).toBeDefined()
+      // Verificar cookie en header set-cookie
+      const setCookie = res.headers['set-cookie'] || ''
+      expect(setCookie).toContain('refreshToken=')
     })
 
     it('should reject wrong password', async () => {

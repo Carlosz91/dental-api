@@ -23,6 +23,7 @@ beforeAll(async () => {
   process.env.BCRYPT_ROUNDS = '4'
   process.env.RATE_LIMIT_MAX = '1000'
   process.env.FRONTEND_URL = 'http://localhost:5173'
+  process.env.COOKIE_SECRET = 'test-cookie-secret-for-tests-min-32-chars'
 
   // Crear cliente Prisma para tests (solo la primera vez)
   if (!prisma) {
@@ -45,8 +46,8 @@ beforeAll(async () => {
     isSetupDone = true
   }
 
-  // Build app
-  app = await buildApp()
+  // Build app CON el prisma de test (para que los services lo reciban al registrarse)
+  app = await buildApp(prisma)
   await app.ready()
 })
 
@@ -90,7 +91,11 @@ export async function loginAs(email: string, password: string) {
     payload: { email, password },
   })
   const data = JSON.parse(res.body)
-  return { accessToken: data.accessToken, refreshToken: data.refreshToken, user: data.user }
+  // Extraer refreshToken del header set-cookie
+  const setCookie = res.headers['set-cookie'] || ''
+  const refreshTokenMatch = setCookie.match(/refreshToken=([^;]+)/)
+  const refreshToken = refreshTokenMatch ? refreshTokenMatch[1] : undefined
+  return { accessToken: data.accessToken, refreshToken, user: data.user }
 }
 
 export async function registerAndLogin(data: { email: string; password: string; fullName: string; phone?: string }) {
@@ -100,5 +105,9 @@ export async function registerAndLogin(data: { email: string; password: string; 
     payload: data,
   })
   const body = JSON.parse(res.body)
-  return { accessToken: body.accessToken, refreshToken: body.refreshToken, user: body.user }
+  // Extraer refreshToken del header set-cookie
+  const setCookie = res.headers['set-cookie'] || ''
+  const refreshTokenMatch = setCookie.match(/refreshToken=([^;]+)/)
+  const refreshToken = refreshTokenMatch ? refreshTokenMatch[1] : undefined
+  return { accessToken: body.accessToken, refreshToken, user: body.user }
 }
