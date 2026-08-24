@@ -10,8 +10,15 @@ declare module 'fastify' {
 }
 
 const jwtPlugin: FastifyPluginAsync = async (fastify) => {
+  const accessSecret = process.env.JWT_ACCESS_SECRET
+  const refreshSecret = process.env.JWT_REFRESH_SECRET
+  
+  if (!accessSecret || !refreshSecret) {
+    throw new Error('JWT secrets not configured')
+  }
+
   await fastify.register(jwt, {
-    secret: process.env.JWT_ACCESS_SECRET!,
+    secret: accessSecret,
     sign: { expiresIn: process.env.JWT_ACCESS_TTL || '15m' },
     verify: { algorithms: ['HS256'] },
   })
@@ -26,7 +33,7 @@ const jwtPlugin: FastifyPluginAsync = async (fastify) => {
 
   fastify.decorate('verifyRefresh', async (request, reply) => {
     try {
-      await request.jwtVerify({ secret: process.env.JWT_REFRESH_SECRET! })
+      await request.jwtVerify({ secret: refreshSecret })
     } catch (err) {
       reply.code(401).send({ error: 'No autorizado', message: 'Refresh token inválido o expirado' })
     }

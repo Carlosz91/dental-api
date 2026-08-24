@@ -22,6 +22,11 @@ export class AppointmentService {
     })
     if (!specialist) throw new Error('SPECIALIST_NOT_FOUND')
 
+    // Validar que la especialidad coincida con la del especialista
+    if (specialist.specialty !== data.specialty) {
+      throw new Error('SPECIALTY_MISMATCH')
+    }
+
     // Buscar o crear paciente por teléfono
     let patient = await this.prisma.user.findFirst({
       where: { phone: data.patientPhone, role: 'PATIENT' },
@@ -65,8 +70,18 @@ export class AppointmentService {
       await this.logAudit(appointment.id, 'CREATED', null, 'PENDIENTE', data.createdById, { source: data.source })
       return appointment
     } catch (err) {
-      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2003') {
-        throw new Error('SLOT_CONFLICT')
+      // Handle Prisma errors - check both known and unknown request errors
+      if (err instanceof Prisma.PrismaClientKnownRequestError) {
+        // P2003 = foreign key constraint, P2000 = constraint violation, 23P01 = exclusion constraint violation
+        if (err.code === 'P2003' || err.code === 'P2000' || err.code === '23P01') {
+          throw new Error('SLOT_CONFLICT')
+        }
+      } else if (err instanceof Prisma.PrismaClientUnknownRequestError) {
+        // Check if the underlying error is an exclusion constraint violation (23P01)
+        const errorMessage = err.message || ''
+        if (errorMessage.includes('23P01') || errorMessage.includes('exclusion constraint')) {
+          throw new Error('SLOT_CONFLICT')
+        }
       }
       throw err
     }
