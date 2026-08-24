@@ -5,8 +5,8 @@ import rateLimit from '@fastify/rate-limit'
 const rateLimitPlugin: FastifyPluginAsync = async (fastify) => {
   await fastify.register(rateLimit, {
     global: true,
-    max: fastify.config.RATE_LIMIT_MAX,
-    timeWindow: fastify.config.RATE_LIMIT_WINDOW_MS,
+    max: Number(process.env.RATE_LIMIT_MAX) || 100,
+    timeWindow: Number(process.env.RATE_LIMIT_WINDOW_MS) || 60000,
     keyGenerator: (request) => request.ip,
     allowList: ['127.0.0.1', '::1'],
     errorMessage: 'Demasiadas peticiones, intente más tarde',

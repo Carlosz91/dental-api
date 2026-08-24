@@ -11,6 +11,7 @@ export default defineConfig({
     hookTimeout: 15000,
     pool: 'forks',
     poolOptions: { forks: { singleFork: true } },
+    sequence: { hooks: 'list' }, // run hooks sequentially
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

@@ -49,10 +49,11 @@ model User {
   updatedAt     DateTime  @updatedAt
   lastLoginAt   DateTime?
 
-  specialist    Specialist?
-  appointments  Appointment[] @relation("PatientAppointments")
+  specialist      Specialist?
+  appointments    Appointment[] @relation("PatientAppointments")
   createdAppointments Appointment[] @relation("CreatedAppointments")
-  auditEvents   AuditEvent[]
+  auditEvents     AuditEvent[]
+  refreshTokens   RefreshToken[]
 
   @@index([email])
   @@index([role])

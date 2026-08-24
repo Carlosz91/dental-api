@@ -7,6 +7,7 @@ import prismaPlugin from './plugins/prisma.js'
 import jwtPlugin from './plugins/jwt.js'
 import rateLimitPlugin from './plugins/rate-limit.js'
 import swaggerPlugin from './plugins/swagger.js'
+import authPlugin from './middleware/auth.js'
 import { authRoutes } from './modules/auth/routes.js'
 import { specialistRoutes } from './modules/specialists/routes.js'
 import { availabilityRoutes } from './modules/availability/routes.js'
@@ -23,6 +24,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(jwtPlugin)
   await app.register(rateLimitPlugin)
   await app.register(swaggerPlugin)
+  await app.register(authPlugin)
 
   // CORS + Helmet
   await app.register(import('@fastify/cors'), {

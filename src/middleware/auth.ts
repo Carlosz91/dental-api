@@ -1,5 +1,6 @@
-import { FastifyRequest, FastifyReply } from 'fastify'
-import { PrismaClient, UserRole } from '@prisma/client'
+import { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify'
+import { UserRole } from '@prisma/client'
+import fp from 'fastify-plugin'
 
 export interface AuthUser {
   id: string
@@ -12,9 +13,14 @@ declare module 'fastify' {
   interface FastifyRequest {
     user?: AuthUser
   }
+  interface FastifyInstance {
+    requireAuth: (request: FastifyRequest, reply: FastifyReply) => Promise<void>
+    requireRole: (...roles: UserRole[]) => (request: FastifyRequest, reply: FastifyReply) => Promise<void>
+    requireOwnershipOrStaff: (getResourceUserId: (request: FastifyRequest) => Promise<string>) => (request: FastifyRequest, reply: FastifyReply) => Promise<void>
+  }
 }
 
-export async function requireAuth(request: FastifyRequest, reply: FastifyReply) {
+async function requireAuth(request: FastifyRequest, reply: FastifyReply) {
   try {
     await request.jwtVerify()
     request.user = request.user as AuthUser
@@ -23,7 +29,7 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply) 
   }
 }
 
-export function requireRole(...roles: UserRole[]) {
+function requireRole(...roles: UserRole[]) {
   return async (request: FastifyRequest, reply: FastifyReply) => {
     await requireAuth(request, reply)
     if (!request.user || !roles.includes(request.user.role)) {
@@ -32,7 +38,7 @@ export function requireRole(...roles: UserRole[]) {
   }
 }
 
-export function requireOwnershipOrStaff(getResourceUserId: (request: FastifyRequest) => Promise<string>) {
+function requireOwnershipOrStaff(getResourceUserId: (request: FastifyRequest) => Promise<string>) {
   return async (request: FastifyRequest, reply: FastifyReply) => {
     await requireAuth(request, reply)
     const resourceUserId = await getResourceUserId(request)
@@ -41,3 +47,12 @@ export function requireOwnershipOrStaff(getResourceUserId: (request: FastifyRequ
     }
   }
 }
+
+const authPlugin: FastifyPluginAsync = async (fastify) => {
+  fastify.decorate('requireAuth', requireAuth)
+  fastify.decorate('requireRole', requireRole)
+  fastify.decorate('requireOwnershipOrStaff', requireOwnershipOrStaff)
+}
+
+export default fp(authPlugin)
+export { requireAuth, requireRole, requireOwnershipOrStaff }

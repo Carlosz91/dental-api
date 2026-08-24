@@ -44,7 +44,7 @@ export async function specialistRoutes(fastify: FastifyInstance) {
     const existingLicense = await fastify.prisma.specialist.findUnique({ where: { licenseNumber } })
     if (existingLicense) return reply.code(409).send({ error: 'Número de matrícula ya existe' })
 
-    const passwordHash = await hashPassword(password, fastify)
+    const passwordHash = await hashPassword(password)
 
     const user = await fastify.prisma.user.create({
       data: { email, passwordHash, fullName, phone, role: UserRole.SPECIALIST },

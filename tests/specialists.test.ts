@@ -10,12 +10,12 @@ describe('Specialists Module', () => {
 
   beforeEach(async () => {
     // Admin
-    const admin = await createTestUser(prisma, app, { email: 'admin@test.com', role: UserRole.ADMIN })
+    const admin = await createTestUser(prisma, { email: 'admin@test.com', role: UserRole.ADMIN })
     const adminLogin = await loginAs('admin@test.com', 'Test1234!')
     adminToken = adminLogin.accessToken
 
     // Especialista
-    const spec = await createTestSpecialist(prisma, app, { specialty: Specialty.ORTODONCIA })
+    const spec = await createTestSpecialist(prisma, { specialty: Specialty.ORTODONCIA })
     specialistId = spec.id
     const specLogin = await loginAs(spec.user.email, 'Test1234!')
     specialistToken = specLogin.accessToken
@@ -34,7 +34,7 @@ describe('Specialists Module', () => {
     })
 
     it('should not return inactive specialists', async () => {
-      await createTestSpecialist(prisma, app, { specialty: Specialty.ESTETICA, isActive: false })
+      await createTestSpecialist(prisma, { specialty: Specialty.ESTETICA, isActive: false })
       const res = await app.inject({ method: 'GET', url: '/api/v1/specialists' })
       const body = JSON.parse(res.body)
       expect(body.specialists).toHaveLength(1)
@@ -63,7 +63,7 @@ describe('Specialists Module', () => {
     })
 
     it('should reject duplicate license number', async () => {
-      await createTestSpecialist(prisma, app, { licenseNumber: 'LIC-DUP' })
+      await createTestSpecialist(prisma, { licenseNumber: 'LIC-DUP' })
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/specialists',
@@ -105,7 +105,7 @@ describe('Specialists Module', () => {
     })
 
     it('should forbid other specialist', async () => {
-      const other = await createTestSpecialist(prisma, app, { specialty: Specialty.ESTETICA })
+      const other = await createTestSpecialist(prisma, { specialty: Specialty.ESTETICA })
       const otherLogin = await loginAs(other.user.email, 'Test1234!')
       const res = await app.inject({
         method: 'PATCH',

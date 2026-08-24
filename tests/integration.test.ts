@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { app, prisma, registerAndLogin, loginAs } from './setup.js'
-import { createTestSpecialist, createAvailabilityRule } from './utils/factories.js'
+import { createTestSpecialist, createAvailabilityRule, createTestUser } from './utils/factories.js'
 import { Specialty, UserRole, AppointmentStatus } from '@prisma/client'
 
 describe('Integration - Full Booking Flow', () => {
@@ -10,7 +10,7 @@ describe('Integration - Full Booking Flow', () => {
 
   beforeEach(async () => {
     // Setup: especialista con agenda Lunes y Miércoles
-    const spec = await createTestSpecialist(prisma, app, { specialty: Specialty.CIRUGIA })
+    const spec = await createTestSpecialist(prisma, { specialty: Specialty.CIRUGIA })
     specialistId = spec.id
     await createAvailabilityRule(prisma, specialistId, { weekday: 1, startTime: '08:00', endTime: '12:00' }) // Lunes
     await createAvailabilityRule(prisma, specialistId, { weekday: 3, startTime: '14:00', endTime: '18:00' }) // Miércoles
@@ -20,7 +20,7 @@ describe('Integration - Full Booking Flow', () => {
     patientToken = patient.accessToken
 
     // Admin
-    const admin = await createTestUser(prisma, app, { email: 'admin@flow.com', role: UserRole.ADMIN })
+    const admin = await createTestUser(prisma, { email: 'admin@flow.com', role: UserRole.ADMIN })
     const adminLogin = await loginAs('admin@flow.com', 'Test1234!')
     adminToken = adminLogin.accessToken
   })

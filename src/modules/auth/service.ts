@@ -10,7 +10,7 @@ export class AuthService {
     const existing = await this.prisma.user.findUnique({ where: { email: data.email } })
     if (existing) throw new Error('EMAIL_EXISTS')
 
-    const passwordHash = await hashPassword(data.password, this.fastify)
+    const passwordHash = await hashPassword(data.password)
 
     const user = await this.prisma.user.create({
       data: {

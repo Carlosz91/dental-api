@@ -8,8 +8,14 @@ declare module 'fastify' {
 }
 
 const prismaPlugin: FastifyPluginAsync = async (fastify) => {
+  const databaseUrl = process.env.DATABASE_URL
+  if (!databaseUrl) {
+    throw new Error('DATABASE_URL environment variable is not set')
+  }
+
   const prisma = new PrismaClient({
-    log: fastify.config.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+    datasources: { db: { url: databaseUrl } },
+    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
   })
 
   await prisma.$connect()

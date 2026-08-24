@@ -23,8 +23,9 @@
     "@fastify/swagger": "^8.14.0",
     "@fastify/swagger-ui": "^4.0.0",
     "@prisma/client": "^5.10.0",
-    "bcrypt": "^5.1.1",
+    "bcrypt": "^6.0.0",
     "dayjs": "^1.11.10",
+    "dotenv": "^17.4.2",
     "fastify": "^4.26.0",
     "fastify-type-provider-zod": "^1.1.9",
     "zod": "^3.22.4"

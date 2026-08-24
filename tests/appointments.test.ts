@@ -12,7 +12,7 @@ describe('Appointments Module', () => {
 
   beforeEach(async () => {
     // Especialista con disponibilidad Lunes 08:00-14:00
-    const spec = await createTestSpecialist(prisma, app, { specialty: Specialty.ORTODONCIA })
+    const spec = await createTestSpecialist(prisma, { specialty: Specialty.ORTODONCIA })
     specialistId = spec.id
     await createAvailabilityRule(prisma, specialistId, { weekday: 1, startTime: '08:00', endTime: '14:00' })
 
@@ -22,7 +22,7 @@ describe('Appointments Module', () => {
     patientId = patient.user.id
 
     // Admin
-    const admin = await createTestUser(prisma, app, { email: 'admin@test.com', role: UserRole.ADMIN })
+    const admin = await createTestUser(prisma, { email: 'admin@test.com', role: UserRole.ADMIN })
     const adminLogin = await loginAs('admin@test.com', 'Test1234!')
     adminToken = adminLogin.accessToken
   })

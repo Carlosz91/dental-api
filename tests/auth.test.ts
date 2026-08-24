@@ -27,7 +27,7 @@ describe('Auth Module', () => {
     })
 
     it('should reject duplicate email', async () => {
-      await createTestUser(prisma, app, { email: 'dup@example.com' })
+      await createTestUser(prisma, { email: 'dup@example.com' })
 
       const res = await app.inject({
         method: 'POST',
@@ -58,7 +58,7 @@ describe('Auth Module', () => {
 
   describe('POST /api/v1/auth/login', () => {
     beforeEach(async () => {
-      await createTestUser(prisma, app, {
+      await createTestUser(prisma, {
         email: 'login@test.com',
         password: 'CorrectPass123!',
         fullName: 'Login User',
@@ -88,7 +88,7 @@ describe('Auth Module', () => {
     })
 
     it('should reject inactive user', async () => {
-      await createTestUser(prisma, app, { email: 'inactive@test.com', password: 'Pass123!', isActive: false })
+      await createTestUser(prisma, { email: 'inactive@test.com', password: 'Pass123!', isActive: false })
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/auth/login',
@@ -141,7 +141,7 @@ describe('Auth Module', () => {
 
   describe('GET /api/v1/auth/me', () => {
     it('should return current user with specialistId if specialist', async () => {
-      const specialist = await createTestSpecialist(prisma, app, { specialty: Specialty.CIRUGIA })
+      const specialist = await createTestSpecialist(prisma, { specialty: Specialty.CIRUGIA })
       const { accessToken } = await loginAs(`doc-${specialist.id}@example.com`, 'Test1234!')
 
       const res = await app.inject({

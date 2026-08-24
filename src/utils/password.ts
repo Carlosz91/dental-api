@@ -1,8 +1,7 @@
 import bcrypt from 'bcrypt'
-import { FastifyInstance } from 'fastify'
 
-export async function hashPassword(password: string, fastify: FastifyInstance): Promise<string> {
-  const rounds = Number(fastify.config.BCRYPT_ROUNDS) || 12
+export async function hashPassword(password: string): Promise<string> {
+  const rounds = Number(process.env.BCRYPT_ROUNDS) || 12
   return bcrypt.hash(password, rounds)
 }
 

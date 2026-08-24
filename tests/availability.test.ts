@@ -9,10 +9,10 @@ describe('Availability Module', () => {
   let adminToken: string
 
   beforeEach(async () => {
-    const spec = await createTestSpecialist(prisma, app, { specialty: Specialty.ORTODONCIA })
+    const spec = await createTestSpecialist(prisma, { specialty: Specialty.ORTODONCIA })
     specialistId = spec.id
 
-    const admin = await createTestUser(prisma, app, { email: 'admin@test.com', role: UserRole.ADMIN })
+    const admin = await createTestUser(prisma, { email: 'admin@test.com', role: UserRole.ADMIN })
     const adminLogin = await loginAs('admin@test.com', 'Test1234!')
     adminToken = adminLogin.accessToken
 
@@ -55,7 +55,7 @@ describe('Availability Module', () => {
     it('should mark slots as unavailable when appointment exists', async () => {
       const monday = dayjs('2026-08-24').format('YYYY-MM-DD')
       // Crear cita en el primer slot
-      const patient = await createTestUser(prisma, app, { email: 'pat@test.com' })
+      const patient = await createTestUser(prisma, { email: 'pat@test.com' })
       await prisma.appointment.create({
         data: {
           specialistId,
@@ -147,7 +147,7 @@ describe('Availability Module', () => {
     })
 
     it('should forbid other specialist', async () => {
-      const other = await createTestSpecialist(prisma, app, { specialty: Specialty.CIRUGIA })
+      const other = await createTestSpecialist(prisma, { specialty: Specialty.CIRUGIA })
       const otherLogin = await loginAs(other.user.email, 'Test1234!')
       const res = await app.inject({
         method: 'POST',

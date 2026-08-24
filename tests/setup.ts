@@ -2,44 +2,52 @@ import { beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 import { buildApp } from '../src/app.js'
 import { FastifyInstance } from 'fastify'
+import { execSync } from 'node:child_process'
 
-// Test database URL (usa la misma que docker-compose)
-const TEST_DATABASE_URL = 'postgresql://postgres:postgres@localhost:5432/dental_test?schema=public'
+// Test database URL (puerto 5433 para no chocar con dev)
+const TEST_DATABASE_URL = 'postgresql://postgres:postgres@localhost:5433/dental_test?schema=public'
 
 export let app: FastifyInstance
 export let prisma: PrismaClient
 
+let isSetupDone = false
+
 beforeAll(async () => {
-  // Crear cliente Prisma para tests
-  prisma = new PrismaClient({
-    datasources: { db: { url: TEST_DATABASE_URL } },
-  })
-
-  // Limpiar y migrar test DB
-  await prisma.$executeRawUnsafe(`DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;`)
-  await prisma.$executeRawUnsafe(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp";`)
-
-  // Set env para la app
+  // Set env ANTES de cualquier cosa
   process.env.DATABASE_URL = TEST_DATABASE_URL
   process.env.NODE_ENV = 'test'
   process.env.JWT_ACCESS_SECRET = 'test-access-secret-min-32-chars-long'
   process.env.JWT_REFRESH_SECRET = 'test-refresh-secret-min-32-chars-long'
   process.env.JWT_ACCESS_TTL = '15m'
   process.env.JWT_REFRESH_TTL = '7d'
-  process.env.BCRYPT_ROUNDS = '4' // rápido para tests
+  process.env.BCRYPT_ROUNDS = '4'
   process.env.RATE_LIMIT_MAX = '1000'
   process.env.FRONTEND_URL = 'http://localhost:5173'
+
+  // Crear cliente Prisma para tests (solo la primera vez)
+  if (!prisma) {
+    prisma = new PrismaClient({
+      datasources: { db: { url: TEST_DATABASE_URL } },
+    })
+  }
+
+  // Setup de BD solo una vez
+  if (!isSetupDone) {
+    await prisma.$executeRawUnsafe(`DROP SCHEMA IF EXISTS public CASCADE`)
+    await prisma.$executeRawUnsafe(`CREATE SCHEMA public`)
+    await prisma.$executeRawUnsafe(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`)
+
+    execSync('npx prisma migrate deploy', {
+      env: { ...process.env, DATABASE_URL: TEST_DATABASE_URL },
+      stdio: 'inherit',
+    })
+
+    isSetupDone = true
+  }
 
   // Build app
   app = await buildApp()
   await app.ready()
-
-  // Ejecutar migraciones programáticamente
-  const { execSync } = await import('node:child_process')
-  execSync('npx prisma migrate deploy', {
-    env: { ...process.env, DATABASE_URL: TEST_DATABASE_URL },
-    stdio: 'inherit',
-  })
 })
 
 afterAll(async () => {

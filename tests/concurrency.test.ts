@@ -8,13 +8,13 @@ describe('Concurrency - Double Booking Prevention', () => {
   let patientTokens: string[] = []
 
   beforeEach(async () => {
-    const spec = await createTestSpecialist(prisma, app, { specialty: Specialty.ORTODONCIA })
+    const spec = await createTestSpecialist(prisma, { specialty: Specialty.ORTODONCIA })
     specialistId = spec.id
     await createAvailabilityRule(prisma, specialistId, { weekday: 1, startTime: '08:00', endTime: '08:30' })
 
     // Crear 20 pacientes
     for (let i = 0; i < 20; i++) {
-      const patient = await createTestUser(prisma, app, { email: `patient${i}@test.com`, phone: `11-1111-${String(i).padStart(4, '0')}` })
+      const patient = await createTestUser(prisma, { email: `patient${i}@test.com`, phone: `11-1111-${String(i).padStart(4, '0')}` })
       const login = await app.inject({
         method: 'POST',
         url: '/api/v1/auth/login',

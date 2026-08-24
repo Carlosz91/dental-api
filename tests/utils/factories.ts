@@ -1,10 +1,8 @@
 import { PrismaClient, UserRole, Specialty, AppointmentStatus } from '@prisma/client'
 import { hashPassword } from '../../src/utils/password.js'
-import { FastifyInstance } from 'fastify'
 
 export async function createTestUser(
   prisma: PrismaClient,
-  fastify: FastifyInstance,
   overrides: Partial<{
     email: string
     password: string
@@ -15,7 +13,7 @@ export async function createTestUser(
   }> = {}
 ) {
   const password = overrides.password || 'Test1234!'
-  const passwordHash = await hashPassword(password, fastify)
+  const passwordHash = await hashPassword(password)
 
   return prisma.user.create({
     data: {
@@ -31,7 +29,6 @@ export async function createTestUser(
 
 export async function createTestSpecialist(
   prisma: PrismaClient,
-  fastify: FastifyInstance,
   overrides: Partial<{
     userId: string
     licenseNumber: string
@@ -39,7 +36,7 @@ export async function createTestSpecialist(
     isActive: boolean
   }> = {}
 ) {
-  const user = await createTestUser(prisma, fastify, {
+  const user = await createTestUser(prisma, {
     email: `doc-${Date.now()}@example.com`,
     role: UserRole.SPECIALIST,
     fullName: 'Dr. Test',
@@ -93,11 +90,11 @@ export async function createAppointment(
 ) {
   const specialist = overrides.specialistId
     ? await prisma.specialist.findUnique({ where: { id: overrides.specialistId } })
-    : await createTestSpecialist(prisma, {} as any)
+    : await createTestSpecialist(prisma)
 
   const patient = overrides.patientId
     ? await prisma.user.findUnique({ where: { id: overrides.patientId } })
-    : await createTestUser(prisma, {} as any)
+    : await createTestUser(prisma)
 
   return prisma.appointment.create({
     data: {

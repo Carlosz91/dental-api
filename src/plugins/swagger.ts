@@ -4,6 +4,7 @@ import swagger from '@fastify/swagger'
 import swaggerUi from '@fastify/swagger-ui'
 
 const swaggerPlugin: FastifyPluginAsync = async (fastify) => {
+  const port = process.env.PORT || '3000'
   await fastify.register(swagger, {
     openapi: {
       info: {
@@ -12,7 +13,7 @@ const swaggerPlugin: FastifyPluginAsync = async (fastify) => {
         version: '1.0.0',
       },
       servers: [
-        { url: `http://localhost:${fastify.config.PORT}`, description: 'Development' },
+        { url: `http://localhost:${port}`, description: 'Development' },
       ],
       components: {
         securitySchemes: {
