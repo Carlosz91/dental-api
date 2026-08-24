@@ -5,11 +5,20 @@ import { registerSchema, loginSchema, refreshSchema } from './schemas.js'
 export async function authRoutes(fastify: FastifyInstance) {
   const authService = new AuthService(fastify.prisma, fastify)
   const isProd = process.env.NODE_ENV === 'production'
+  const loginRateLimit = Number(process.env.LOGIN_RATE_LIMIT_MAX) || 10
 
   fastify.post('/register', {
     schema: registerSchema,
-    config: { rateLimit: { max: 5, timeWindow: 60000 } },
+    config: { rateLimit: { max: Number(process.env.REGISTER_RATE_LIMIT_MAX) || 5, timeWindow: 60000 } },
   }, async (request, reply) => {
+    // Manual validation to ensure schema works
+    const validationResult = registerSchema.safeParse({ body: request.body })
+    if (!validationResult.success) {
+      return reply.code(400).send({
+        error: 'Validación fallida',
+        details: validationResult.error.errors.map((e) => ({ field: e.path.join('.'), message: e.message })),
+      })
+    }
     try {
       const result = await authService.register(request.body)
       reply.setCookie('refreshToken', result.refreshToken, {
@@ -30,7 +39,7 @@ export async function authRoutes(fastify: FastifyInstance) {
 
   fastify.post('/login', {
     schema: loginSchema,
-    config: { rateLimit: { max: 10, timeWindow: 60000 } },
+    config: { rateLimit: { max: loginRateLimit, timeWindow: 60000 } },
   }, async (request, reply) => {
     try {
       const result = await authService.login(request.body.email, request.body.password)
@@ -65,7 +74,7 @@ export async function authRoutes(fastify: FastifyInstance) {
         maxAge: 7 * 24 * 60 * 60 * 1000,
         path: '/',
       })
-      return { accessToken: result.accessToken, user: result.user }
+      return { accessToken: result.accessToken, refreshToken: result.refreshToken, user: result.user }
     } catch (err) {
       reply.clearCookie('refreshToken', { path: '/' })
       return reply.code(401).send({ error: 'Sesión expirada, inicie sesión nuevamente' })
@@ -86,8 +95,8 @@ export async function authRoutes(fastify: FastifyInstance) {
   }, async (request) => {
     const user = await fastify.prisma.user.findUnique({
       where: { id: request.user!.id },
-      select: { id: true, email: true, fullName: true, role: true, specialistId: true, createdAt: true },
+      select: { id: true, email: true, fullName: true, role: true, specialist: { select: { id: true } }, createdAt: true },
     })
-    return { user }
+    return { user: { ...user, specialistId: user?.specialist?.id ?? null } }
   })
 }

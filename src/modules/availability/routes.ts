@@ -16,6 +16,7 @@ export async function availabilityRoutes(fastify: FastifyInstance) {
 
     const specialist = await fastify.prisma.specialist.findUnique({
       where: { id: specialistId, isActive: true },
+      include: { user: { select: { fullName: true } } },
     })
     if (!specialist) return reply.code(404).send({ error: 'Especialista no encontrado' })
 
@@ -37,6 +38,14 @@ export async function availabilityRoutes(fastify: FastifyInstance) {
       preHandler: [fastify.requireRole('ADMIN', 'STAFF')],
       schema: createAvailabilitySchema,
     }, async (request, reply) => {
+      // Manual validation to ensure refine works
+      const validationResult = createAvailabilitySchema.safeParse({ params: request.params, body: request.body })
+      if (!validationResult.success) {
+        return reply.code(400).send({
+          error: 'Validación fallida',
+          details: validationResult.error.errors.map((e) => ({ field: e.path.join('.'), message: e.message })),
+        })
+      }
       const rule = await fastify.prisma.availabilityRule.create({
         data: { specialistId: request.params.specialistId, ...request.body },
       })
@@ -48,6 +57,13 @@ export async function availabilityRoutes(fastify: FastifyInstance) {
       preHandler: [fastify.requireRole('ADMIN', 'STAFF')],
       schema: updateAvailabilitySchema,
     }, async (request, reply) => {
+      const validationResult = updateAvailabilitySchema.safeParse({ params: request.params, body: request.body })
+      if (!validationResult.success) {
+        return reply.code(400).send({
+          error: 'Validación fallida',
+          details: validationResult.error.errors.map((e) => ({ field: e.path.join('.'), message: e.message })),
+        })
+      }
       const rule = await fastify.prisma.availabilityRule.update({
         where: { id: request.params.id },
         data: request.body,
@@ -69,6 +85,24 @@ export async function availabilityRoutes(fastify: FastifyInstance) {
       preHandler: [fastify.requireRole('ADMIN', 'STAFF', 'SPECIALIST')],
       schema: blockedSlotSchema,
     }, async (request, reply) => {
+      const validationResult = blockedSlotSchema.safeParse({ params: request.params, body: request.body })
+      if (!validationResult.success) {
+        return reply.code(400).send({
+          error: 'Validación fallida',
+          details: validationResult.error.errors.map((e) => ({ field: e.path.join('.'), message: e.message })),
+        })
+      }
+
+      // SPECIALIST solo puede bloquear su propia agenda
+      if (request.user!.role === 'SPECIALIST') {
+        const specialist = await fastify.prisma.specialist.findUnique({
+          where: { userId: request.user!.id },
+        })
+        if (!specialist || specialist.id !== request.params.specialistId) {
+          return reply.code(403).send({ error: 'Prohibido', message: 'Solo puedes bloquear tu propia agenda' })
+        }
+      }
+
       const block = await fastify.prisma.blockedSlot.create({
         data: { specialistId: request.params.specialistId, ...request.body },
       })

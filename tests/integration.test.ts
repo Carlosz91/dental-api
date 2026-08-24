@@ -54,7 +54,9 @@ describe('Integration - Full Booking Flow', () => {
     expect(JSON.parse(confirmRes.body).appointment.status).toBe('CONFIRMADO')
 
     // 3. Especialista marca "En curso"
-    const specLogin = await loginAs(`doc-${specialistId}@example.com`, 'Test1234!')
+    // Get the specialist's user email
+    const specialist = await prisma.specialist.findUnique({ where: { id: specialistId }, include: { user: true } })
+    const specLogin = await loginAs(specialist!.user.email, 'Test1234!')
     const startRes = await app.inject({
       method: 'PATCH',
       url: `/api/v1/appointments/${appointmentId}`,
@@ -130,8 +132,11 @@ describe('Integration - Full Booking Flow', () => {
       method: 'GET',
       url: `/api/v1/availability/${specialistId}/slots?date=2026-08-24`,
     })
-    const slots = JSON.parse(slotsRes.body).slots
-    const targetSlot = slots.find((s: any) => s.startsAt.includes('08:00'))
+    const slotsBody = typeof slotsRes.body === 'string' ? JSON.parse(slotsRes.body) : slotsRes.body
+    const slots = slotsBody.slots
+    // 08:00 local (-03:00) = 11:00 UTC
+    const targetSlot = slots.find((s: any) => s.startsAt.includes('11:00'))
+    expect(targetSlot).toBeDefined()
     expect(targetSlot.available).toBe(true)
   })
 })

@@ -154,9 +154,11 @@ export class AppointmentService {
     specialty?: string
     from?: Date
     to?: Date
-    page: number
-    limit: number
+    page?: number
+    limit?: number
   }) {
+    const page = filters.page ?? 1
+    const limit = filters.limit ?? 20
     const where: Prisma.AppointmentWhereInput = {}
 
     if (filters.specialistId) where.specialistId = filters.specialistId
@@ -177,13 +179,13 @@ export class AppointmentService {
           patient: { select: { fullName: true, phone: true } },
         },
         orderBy: { startsAt: 'asc' },
-        skip: (filters.page - 1) * filters.limit,
-        take: filters.limit,
+        skip: (page - 1) * limit,
+        take: limit,
       }),
       this.prisma.appointment.count({ where }),
     ])
 
-    return { appointments, total, page: filters.page, limit: filters.limit, totalPages: Math.ceil(total / filters.limit) }
+    return { appointments, total, page, limit, totalPages: Math.ceil(total / limit) }
   }
 
   async getAuditEvents(appointmentId: string) {

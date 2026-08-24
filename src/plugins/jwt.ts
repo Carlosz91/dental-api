@@ -25,15 +25,19 @@ const jwtPlugin: FastifyPluginAsync = async (fastify) => {
 
   fastify.decorate('authenticate', async (request, reply) => {
     try {
+      // Debug: log the authorization header
+      fastify.log.info({ authHeader: request.headers.authorization }, 'Auth header')
       await request.jwtVerify()
+      fastify.log.info({ user: request.user }, 'User authenticated')
     } catch (err) {
+      fastify.log.error({ err }, 'Auth failed')
       reply.code(401).send({ error: 'No autorizado', message: 'Token inválido o expirado' })
     }
   })
 
   fastify.decorate('verifyRefresh', async (request, reply) => {
     try {
-      await request.jwtVerify({ secret: refreshSecret })
+      await request.jwtVerify({ secret: process.env.JWT_REFRESH_SECRET! })
     } catch (err) {
       reply.code(401).send({ error: 'No autorizado', message: 'Refresh token inválido o expirado' })
     }

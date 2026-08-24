@@ -23,6 +23,7 @@ export async function appointmentRoutes(fastify: FastifyInstance) {
     } catch (err) {
       if (err.message === 'SPECIALIST_NOT_FOUND') return reply.code(404).send({ error: 'Especialista no encontrado' })
       if (err.message === 'SLOT_CONFLICT') return reply.code(409).send({ error: 'El horario ya no está disponible' })
+      if (err.message === 'SPECIALTY_MISMATCH') return reply.code(400).send({ error: 'La especialidad no coincide con la del especialista' })
       throw err
     }
   })

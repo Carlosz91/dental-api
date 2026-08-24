@@ -122,6 +122,7 @@ model Appointment {
   notes           String?
   source          AppointmentSource @default(WEB)
   version         Int               @default(1)
+  cancellationReason String?         // Motivo de cancelación
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 

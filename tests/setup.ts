@@ -21,9 +21,12 @@ beforeAll(async () => {
   process.env.JWT_ACCESS_TTL = '15m'
   process.env.JWT_REFRESH_TTL = '7d'
   process.env.BCRYPT_ROUNDS = '4'
-  process.env.RATE_LIMIT_MAX = '1000'
+  process.env.RATE_LIMIT_MAX = '10000'
   process.env.FRONTEND_URL = 'http://localhost:5173'
   process.env.COOKIE_SECRET = 'test-cookie-secret-for-tests-min-32-chars'
+  // Deshabilitar rate limit en login para tests
+  process.env.LOGIN_RATE_LIMIT_MAX = '10000'
+  process.env.REGISTER_RATE_LIMIT_MAX = '10000'
 
   // Crear cliente Prisma para tests (solo la primera vez)
   if (!prisma) {

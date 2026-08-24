@@ -15,15 +15,20 @@ export async function calculateAvailableSlots(
   specialistId: string,
   date: Date
 ): Promise<TimeSlot[]> {
-  const dayOfWeek = dayjs(date).day() // 0=Dom
+  // Use dayjs to get the day of week from the date string to avoid timezone issues
+  const dateStr = date.toISOString().split('T')[0]
+  const dayOfWeek = dayjs(dateStr).day() // 0=Dom
+
+  // Create a Date at start of day UTC for consistent Prisma comparisons
+  const queryDate = dayjs(dateStr).startOf('day').toDate()
 
   // 1. Reglas de disponibilidad vigentes
   const rules = await prisma.availabilityRule.findMany({
     where: {
       specialistId,
       weekday: dayOfWeek,
-      effectiveFrom: { lte: date },
-      OR: [{ effectiveTo: null }, { effectiveTo: { gte: date } }],
+      effectiveFrom: { lte: queryDate },
+      OR: [{ effectiveTo: null }, { effectiveTo: { gte: queryDate } }],
     },
     orderBy: { startTime: 'asc' },
   })
@@ -31,8 +36,8 @@ export async function calculateAvailableSlots(
   if (rules.length === 0) return []
 
   // 2. Citas existentes ese día (no canceladas/no asistió)
-  const dayStart = dayjs(date).startOf('day').toDate()
-  const dayEnd = dayjs(date).endOf('day').toDate()
+  const dayStart = dayjs(dateStr).startOf('day').toDate()
+  const dayEnd = dayjs(dateStr).endOf('day').toDate()
 
   const appointments = await prisma.appointment.findMany({
     where: {
@@ -59,12 +64,16 @@ export async function calculateAvailableSlots(
     const [startH, startM] = rule.startTime.split(':').map(Number)
     const [endH, endM] = rule.endTime.split(':').map(Number)
 
-    let current = dayjs(date).hour(startH).minute(startM)
-    const limit = dayjs(date).hour(endH).minute(endM)
+    let current = dayjs(dateStr).hour(startH).minute(startM)
+    const limit = dayjs(dateStr).hour(endH).minute(endM)
 
-    while (current.add(rule.slotMinutes, 'minute').isSameOrBefore(limit)) {
+    // Check if slot END time is <= limit (original logic was: current.add(slotMinutes).isSameOrBefore(limit))
+    while (true) {
+      const slotEnd = current.add(rule.slotMinutes, 'minute')
+      if (slotEnd.isAfter(limit)) break
+
       const slotStart = current.toDate()
-      const slotEnd = current.add(rule.slotMinutes, 'minute').toDate()
+      const slotEndDate = slotEnd.toDate()
 
       // ¿Hay cita en este slot?
       const appointment = appointments.find(
@@ -73,12 +82,12 @@ export async function calculateAvailableSlots(
 
       // ¿Hay bloqueo?
       const block = blocked.find(
-        (b) => b.startsAt <= slotStart && b.endsAt >= slotEnd
+        (b) => b.startsAt <= slotStart && b.endsAt >= slotEndDate
       )
 
       slots.push({
         startsAt: slotStart,
-        endsAt: slotEnd,
+        endsAt: slotEndDate,
         available: !appointment && !block,
         appointmentId: appointment?.id,
         blocked: !!block,

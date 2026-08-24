@@ -1,5 +1,6 @@
 import { PrismaClient, UserRole, Specialty, AppointmentStatus } from '@prisma/client'
 import { hashPassword } from '../../src/utils/password.js'
+import dayjs from 'dayjs'
 
 export async function createTestUser(
   prisma: PrismaClient,
@@ -72,7 +73,7 @@ export async function createAvailabilityRule(
       endTime: overrides.endTime || '14:00',
       slotMinutes: overrides.slotMinutes ?? 30,
       bufferMinutes: overrides.bufferMinutes ?? 5,
-      effectiveFrom: new Date(),
+      effectiveFrom: dayjs().startOf('day').toDate(),
     },
   })
 }

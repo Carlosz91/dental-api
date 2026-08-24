@@ -132,7 +132,9 @@ describe('Availability Module', () => {
 
   describe('POST /api/v1/availability/:specialistId/blocks', () => {
     it('should allow specialist to block own schedule', async () => {
-      const specLogin = await loginAs(`doc-${specialistId}@example.com`, 'Test1234!')
+      // Get the specialist to find the correct email
+      const specialist = await prisma.specialist.findUnique({ where: { id: specialistId }, include: { user: true } })
+      const specLogin = await loginAs(specialist!.user.email, 'Test1234!')
       const res = await app.inject({
         method: 'POST',
         url: `/api/v1/availability/${specialistId}/blocks`,

@@ -74,10 +74,22 @@ export async function specialistRoutes(fastify: FastifyInstance) {
       return reply.code(403).send({ error: 'Prohibido' })
     }
 
+    // Separar campos de User y Specialist
+    const { phone, fullName, email, ...specialistData } = request.body
+
+    // Actualizar User si hay campos de usuario
+    if (phone !== undefined || fullName !== undefined || email !== undefined) {
+      await fastify.prisma.user.update({
+        where: { id: specialist.userId },
+        data: { phone, fullName, email },
+      })
+    }
+
+    // Actualizar Specialist con el resto de campos
     const updated = await fastify.prisma.specialist.update({
       where: { id: request.params.id },
-      data: request.body,
-      include: { user: { select: { fullName: true, email: true } } },
+      data: specialistData,
+      include: { user: { select: { fullName: true, email: true, phone: true } } },
     })
 
     return { specialist: updated }

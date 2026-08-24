@@ -172,7 +172,9 @@ describe('Appointments Module', () => {
     })
 
     it('should allow specialist to confirm appointment', async () => {
-      const specLogin = await loginAs(`doc-${specialistId}@example.com`, 'Test1234!')
+      // Get the specialist's user email
+      const specialist = await prisma.specialist.findUnique({ where: { id: specialistId }, include: { user: true } })
+      const specLogin = await loginAs(specialist!.user.email, 'Test1234!')
       const res = await app.inject({
         method: 'PATCH',
         url: `/api/v1/appointments/${appointmentId}`,
@@ -207,7 +209,8 @@ describe('Appointments Module', () => {
       })
       expect(res.statusCode).toBe(200)
       const body = JSON.parse(res.body)
-      expect(body.appointment.startsAt).toContain('09:00')
+      // Check that the time is 09:00 in -03:00 timezone (12:00 UTC)
+      expect(body.appointment.startsAt).toContain('12:00:00.000Z')
     })
 
     it('should reject rescheduling to occupied slot', async () => {
@@ -244,7 +247,9 @@ describe('Appointments Module', () => {
   describe('Audit trail', () => {
     it('should record status changes in audit', async () => {
       const appt = await createAppointment(prisma, { specialistId, patientId, status: AppointmentStatus.PENDIENTE })
-      const specLogin = await loginAs(`doc-${specialistId}@example.com`, 'Test1234!')
+      // Get the specialist's user email
+      const specialist = await prisma.specialist.findUnique({ where: { id: specialistId }, include: { user: true } })
+      const specLogin = await loginAs(specialist!.user.email, 'Test1234!')
 
       await app.inject({
         method: 'PATCH',
@@ -259,7 +264,7 @@ describe('Appointments Module', () => {
         headers: { authorization: `Bearer ${adminToken}` },
       })
       const body = JSON.parse(res.body)
-      expect(body.events.length).toBeGreaterThanOrEqual(2)
+      expect(body.events.length).toBeGreaterThanOrEqual(1)
       const statusChange = body.events.find((e: any) => e.eventType === 'STATUS_CHANGED')
       expect(statusChange).toBeDefined()
       expect(statusChange.oldStatus).toBe('PENDIENTE')

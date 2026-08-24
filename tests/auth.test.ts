@@ -146,7 +146,7 @@ describe('Auth Module', () => {
   describe('GET /api/v1/auth/me', () => {
     it('should return current user with specialistId if specialist', async () => {
       const specialist = await createTestSpecialist(prisma, { specialty: Specialty.CIRUGIA })
-      const { accessToken } = await loginAs(`doc-${specialist.id}@example.com`, 'Test1234!')
+      const { accessToken } = await loginAs(specialist.user.email, 'Test1234!')
 
       const res = await app.inject({
         method: 'GET',

@@ -26,14 +26,22 @@ export const updateAvailabilitySchema = z.object({
     bufferMinutes: z.number().int().min(0).max(30).optional(),
     effectiveFrom: z.string().datetime().optional(),
     effectiveTo: z.string().datetime().nullable().optional(),
+  }).refine((data) => {
+    if (data.startTime && data.endTime) {
+      return data.startTime < data.endTime
+    }
+    return true
+  }, {
+    message: 'startTime debe ser anterior a endTime',
+    path: ['startTime'],
   }),
 })
 
 export const blockedSlotSchema = z.object({
   params: z.object({ specialistId: z.string().uuid() }),
   body: z.object({
-    startsAt: z.string().datetime(),
-    endsAt: z.string().datetime(),
+    startsAt: z.string().datetime({ offset: true }),
+    endsAt: z.string().datetime({ offset: true }),
     reason: z.string().min(3).max(200),
   }).refine((data) => new Date(data.startsAt) < new Date(data.endsAt), {
     message: 'startsAt debe ser anterior a endsAt',
