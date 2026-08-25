@@ -1,0 +1,93 @@
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: [
+    './index.html',
+    './src/**/*.{js,ts,jsx,tsx}',
+  ],
+  theme: {
+    extend: {
+      colors: {
+        dental: {
+          50: '#f0f9ff',
+          100: '#e8f0fe',
+          200: '#d0e4fd',
+          300: '#b8d7fb',
+          400: '#98c0f8',
+          500: '#7aabf5',
+          600: '#5c98e8',
+          700: '#4685d8',
+          800: '#3672c8',
+          900: '#2a5eb9',
+        },
+        purple: {
+          100: '#f5f0ff',
+          200: '#e4d8f5',
+          300: '#d2c0f0',
+          400: '#bc98eb',
+          500: '#a876e7',
+          600: '#8e5cd3',
+          700: '#7144c0',
+          800: '#5532ad',
+          900: '#3d2198',
+        },
+        red: {
+          100: '#fef2f2',
+          200: '#fecccc',
+          300: '#fca5a5',
+          400: '#f87171',
+          500: '#ef4444',
+          600: '#dc2626',
+          700: '#b91c1c',
+          800: '#991b1b',
+          900: '#7f1d1d',
+        },
+        pink: {
+          100: '#fdf2f8',
+          200: '#fce7f3',
+          300: '#fbcfe8',
+          400: '#f472b6',
+          500: '#ec4899',
+          600: '#db2777',
+          700: '#be185d',
+          800: '#9d174d',
+          900: '#831843',
+        },
+        slate: {
+          50: '#f8fafc',
+          100: '#f1f5f9',
+          200: '#e2e8f0',
+          400: '#94a3b8',
+          500: '#64748b',
+          600: '#475569',
+          700: '#334155',
+          800: '#1e293b',
+          900: '#0f172a',
+        },
+        borderDental: {
+          DEFAULT: 'rgb(var(--border) / 1)',
+          50: 'rgb(var(--border) / 0.1)',
+          100: 'rgb(var(--border) / 0.2)',
+          200: 'rgb(var(--border) / 0.3)',
+          300: 'rgb(var(--border) / 0.4)',
+          400: 'rgb(var(--border) / 0.5)',
+        },
+        shadowCard: {
+          DEFAULT: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+        },
+      },
+      borderWidth: {
+        DEFAULT: '1px',
+        0: '0px',
+      },
+      borderRadius: {
+        DEFAULT: '0.5rem',
+        lg: '1rem',
+        xl: '1.5rem',
+      },
+      boxShadow: {
+        card: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+      },
+    },
+  },
+  plugins: [],
+}

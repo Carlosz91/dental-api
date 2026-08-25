@@ -1,0 +1,221 @@
+﻿/* Dental Theme CSS - Optimized for Tailwind CSS */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Capa base - variables CSS y reset */
+@layer base {
+  :root {
+    --background: 240 249 255;
+    --foreground: 15 23 42;
+    --card: 255 255 255;
+    --card-foreground: 15 23 42;
+    --primary: 14 165 233;
+    --primary-foreground: 255 255 255;
+    --secondary: 224 242 254;
+    --secondary-foreground: 15 23 42;
+    --muted: 224 242 254;
+    --muted-foreground: 100 116 139;
+    --accent: 186 230 253;
+    --accent-foreground: 15 23 42;
+    --destructive: 239 68 68;
+    --destructive-foreground: 255 255 255;
+    --border: 186 230 253;
+    --input: 186 230 253;
+    --ring: 14 165 233;
+    --radius: 1rem;
+  }
+
+  .dark {
+    --background: 15 23 42;
+    --foreground: 248 250 252;
+    --card: 30 41 59;
+    --card-foreground: 248 250 252;
+    --primary: 56 189 248;
+    --primary-foreground: 15 23 42;
+    --secondary: 30 41 59;
+    --secondary-foreground: 248 250 252;
+    --muted: 30 41 59;
+    --muted-foreground: 148 163 184;
+    --accent: 30 41 59;
+    --accent-foreground: 248 250 252;
+    --destructive: 239 68 68;
+    --destructive-foreground: 255 255 255;
+    --border: 51 65 85;
+    --input: 51 65 85;
+    --ring: 56 189 248;
+  }
+
+  /* Base styles */
+  body {
+    @apply bg-dental-50 text-slate-900 antialiased;
+    font-feature-settings: "cv02" "cv03" "cv04" "cv11";
+  }
+
+  html {
+    /* scroll-behavior-smooth no es clase nativa de Tailwind */
+    /* Aplicamos el comportamiento directamente */
+    scroll-behavior: smooth;
+  }
+
+  /* Scrollbar */
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: #b8d7fb #e8f0fe;
+  }
+
+  ::-webkit-scrollbar {
+    @apply w-2 h-2;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-dental-100;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-dental-300 rounded-full;
+  }
+
+  ::-webkit-scrollbar-corner {
+    @apply bg-dental-100;
+  }
+
+  /* Selection */
+  ::selection {
+    @apply bg-dental-200 text-dental-900;
+  }
+}
+
+/* Capa de componentes */
+@layer components {
+  /* Botones dentales */
+  .btn-dental {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl px-6 py-3 text-sm font-medium transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dental-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none;
+  }
+
+  .btn-dental-primary {
+    @apply btn-dental bg-dental-500 text-white shadow-card hover:bg-dental-600 hover:shadow-card hover:-translate-y-0.5 active:bg-dental-700 active:shadow-card active:translate-y-0;
+  }
+
+  .btn-dental-secondary {
+    @apply btn-dental bg-dental-100 text-dental-700 border border-dental-200 shadow-sm hover:bg-dental-200 hover:border-dental-300 hover:shadow-card hover:-translate-y-0.5 active:bg-dental-300 active:shadow-sm active:translate-y-0;
+  }
+
+  .btn-dental-outline {
+    @apply btn-dental bg-transparent text-dental-600 border-2 border-dental-300 hover:bg-dental-50 hover:border-dental-400 hover:shadow-card hover:-translate-y-0.5 active:bg-dental-100 active:shadow-sm active:translate-y-0;
+  }
+
+  .btn-dental-ghost {
+    @apply btn-dental bg-transparent text-dental-600 hover:bg-dental-100 hover:shadow-sm active:bg-dental-200;
+  }
+
+  /* Tarjetas dentales */
+  .card-dental {
+    @apply bg-white rounded-3xl border border-dental-100 shadow-card transition-all duration-300 ease-out hover:shadow-lg hover:border-dental-200 hover:-translate-y-1;
+  }
+
+  .card-dental-elevated {
+    @apply card-dental shadow-xl border-dental-200;
+  }
+
+  /* Inputs dentales */
+  .input-dental {
+    @apply w-full rounded-2xl border border-dental-200 bg-white px-4 py-3 text-slate-900 placeholder:text-dental-400 focus:border-dental-500 focus:ring-2 focus:ring-dental-500/20 focus:outline-none hover:border-dental-300 disabled:bg-dental-50 disabled:cursor-not-allowed transition-all duration-200;
+  }
+
+  /* Badges de especialidad */
+  .badge-specialty {
+    @apply inline-flex items-center gap-1.5 rounded-xl px-3 py-1 text-xs font-medium;
+  }
+
+  .badge-ortodoncia {
+    @apply badge-specialty bg-purple-100 text-purple-700 border border-purple-200;
+  }
+
+  .badge-cirugia {
+    @apply badge-specialty bg-red-100 text-red-700 border border-red-200;
+  }
+
+  .badge-estetica {
+    @apply badge-specialty bg-pink-100 text-pink-700 border border-pink-200;
+  }
+
+  /* Logos en esquina */
+  .corner-logo {
+    @apply fixed top-6 left-6 z-50 w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-dental-500 to-dental-600 rounded-2xl shadow-card flex items-center justify-center text-white animate-pulse-subtle;
+  }
+
+  .corner-logo-right {
+    @apply fixed top-6 right-6 z-50 w-10 h-10 sm:w-12 sm:h-12;
+  }
+
+  /* Animate classes */
+  .animate-pulse-subtle {
+    animation: pulseSubtle 3s ease-in-out infinite;
+  }
+
+  .animate-fade-in-up {
+    animation: fadeInUp 0.6s ease-out forwards;
+  }
+
+  .animate-slide-in-right {
+    animation: slideInRight 0.5s ease-out forwards;
+  }
+}
+
+/* Capa de utilidades */
+@layer utilities {
+  .booking-action-hint {
+    order: 2;
+  }
+
+  .flex.flex-col.items-stretch.justify-end.gap-2 > span.text-xs.text-slate-400,
+  .flex.flex-col.items-stretch.gap-2 > span.text-xs.text-slate-400 {
+    order: 2;
+  }
+
+  .text-balance {
+    @apply text-wrap-balance;
+  }
+
+  .glass {
+    @apply bg-white/80 backdrop-blur-lg;
+  }
+
+  .glass-card {
+    @apply bg-white/90 backdrop-blur-xl border-dental-200/50;
+  }
+}
+
+/* Keyframes */
+@keyframes pulseSubtle {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(14, 165, 233, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(14, 165, 233, 0);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
