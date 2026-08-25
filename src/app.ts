@@ -40,8 +40,16 @@ export async function buildApp(prisma?: PrismaClient): Promise<FastifyInstance> 
   })
 
   // CORS + Helmet
+  // Allow localhost/LAN origins in development; restrict via FRONTEND_URL in production
+  const allowedOriginPattern = /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3})(:\d+)?$/
   await app.register(import('@fastify/cors'), {
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: (origin, cb) => {
+      if (!origin || allowedOriginPattern.test(origin)) {
+        cb(null, true)
+      } else {
+        cb(null, false)
+      }
+    },
     credentials: true,
   })
   await app.register(import('@fastify/helmet'), {

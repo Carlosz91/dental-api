@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import { FastifyPluginAsync } from 'fastify'
+import fp from 'fastify-plugin'
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -7,7 +8,8 @@ declare module 'fastify' {
   }
 }
 
-const prismaPlugin: FastifyPluginAsync = async (fastify) => {
+// Wrapped with fp so the prisma decorator is visible to routes on the parent scope
+const prismaPlugin: FastifyPluginAsync = fp(async (fastify) => {
   const databaseUrl = process.env.DATABASE_URL
   if (!databaseUrl) {
     throw new Error('DATABASE_URL environment variable is not set')
@@ -25,6 +27,6 @@ const prismaPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('onClose', async () => {
     await prisma.$disconnect()
   })
-}
+}, { name: 'prisma' })
 
 export default prismaPlugin

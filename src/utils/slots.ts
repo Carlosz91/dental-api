@@ -75,9 +75,9 @@ export async function calculateAvailableSlots(
       const slotStart = current.toDate()
       const slotEndDate = slotEnd.toDate()
 
-      // ¿Hay cita en este slot?
+      // ¿Hay cita que se solape con este slot? (overlap real, no igualdad exacta)
       const appointment = appointments.find(
-        (a) => a.startsAt.getTime() === slotStart.getTime()
+        (a) => a.startsAt < slotEndDate && a.endsAt > slotStart
       )
 
       // ¿Hay bloqueo?
