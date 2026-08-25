@@ -46,7 +46,7 @@ interface ApiAppointment {
   status: string;
   specialty?: string;
   patient?: { fullName?: string };
-  specialist?: { user?: { fullName?: string } };
+  specialist?: { id?: string; user?: { fullName?: string } };
 }
 
 function mapApiAppointment(raw: ApiAppointment): Appointment {
@@ -64,6 +64,10 @@ function mapApiAppointment(raw: ApiAppointment): Appointment {
     status: mapStatus(raw.status),
   };
 }
+
+/** Reusable by staff-facing views (e.g. specialist dashboard) */
+export { mapApiAppointment };
+export type { ApiAppointment };
 
 export interface CreateAppointmentInput {
   specialistId: string;

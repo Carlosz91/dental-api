@@ -198,8 +198,8 @@ export const MyAppointments = () => {
                     <Button variant="outline" size="sm" className="w-full sm:w-auto justify-start gap-1.5" aria-label="Cancelar" title="Cancelar" disabled={isCancelling} onClick={() => void handleCancel(appointment.id)}>
                       <Ban className="h-3.5 w-3.5" /> <span>Cancelar</span>
                     </Button>
-                    <Button variant="secondary" size="sm" className="w-full sm:w-auto justify-start gap-1.5" aria-label="Actualizar" title="Actualizar" disabled={isRescheduling} onClick={() => setEditingId(isEditing ? null : appointment.id)}>
-                      <CalendarClock className="h-3.5 w-3.5" /> <span>{isEditing ? 'Cerrar' : 'Actualizar'}</span>
+                    <Button variant="secondary" size="sm" className="w-full sm:w-auto justify-start gap-1.5" aria-label="Reprogramar" title="Reprogramar" disabled={isRescheduling} onClick={() => setEditingId(isEditing ? null : appointment.id)}>
+                      <CalendarClock className="h-3.5 w-3.5" /> <span>{isEditing ? 'Cerrar' : 'Reprogramar'}</span>
                     </Button>
                   </div>
                 </div>

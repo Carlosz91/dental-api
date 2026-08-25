@@ -22,7 +22,7 @@ services:
       - "3000:3000"
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/dental?schema=public
-      NODE_ENV: development
+      NODE_ENV: ${NODE_ENV:-development}
       FRONTEND_URL: http://localhost:5173
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}

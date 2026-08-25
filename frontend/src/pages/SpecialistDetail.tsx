@@ -117,9 +117,9 @@ export const SpecialistDetail = () => {
                 className="w-full rounded-2xl border border-dental-200 px-4 py-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-dental-500/20"
               >
                 <option value="">Seleccionar hora</option>
-                {availableSlots.map((slot: string) => (
-                  <option key={slot} value={slot}>
-                    {slot}
+                {availableSlots.map((slot) => (
+                  <option key={slot.startsAt} value={slot.startsAt}>
+                    {slot.label}
                   </option>
                 ))}
               </select>

@@ -3,9 +3,11 @@ import fp from 'fastify-plugin'
 import rateLimit from '@fastify/rate-limit'
 
 const rateLimitPlugin: FastifyPluginAsync = async (fastify) => {
+  // Single GLOBAL limiter. Route-specific stricter limits are declared
+  // per-route via `config: { rateLimit: { ... } }` (see login/register/create).
   await fastify.register(rateLimit, {
     global: true,
-    max: Number(process.env.RATE_LIMIT_MAX) || 100,
+    max: Number(process.env.RATE_LIMIT_MAX) || 300,
     timeWindow: Number(process.env.RATE_LIMIT_WINDOW_MS) || 60000,
     keyGenerator: (request) => request.ip,
     allowList: ['127.0.0.1', '::1'],
@@ -20,18 +22,6 @@ const rateLimitPlugin: FastifyPluginAsync = async (fastify) => {
       'x-ratelimit-reset': true,
     },
     skipOnError: false,
-  })
-
-  // Rate limit específico para auth (más estricto)
-  fastify.register(rateLimit, {
-    max: 10,
-    timeWindow: 60000,
-    keyGenerator: (request) => `auth:${request.ip}`,
-    errorResponseBuilder: () => ({
-      code: 429,
-      error: 'Too Many Requests',
-      message: 'Demasiados intentos de autenticación',
-    }),
   })
 }
 

@@ -1,15 +1,7 @@
 import { FastifyInstance, FastifyRequest } from 'fastify'
 import { AuthService } from './service.js'
 import { registerSchema, loginSchema, refreshSchema } from './schemas.js'
-import { z } from 'zod'
-
-type RegisterBody = z.infer<typeof registerSchema>['body']
-type LoginBody = z.infer<typeof loginSchema>['body']
-type RefreshBody = z.infer<typeof refreshSchema>['body']
-
-function errMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
-}
+import { parseRequest } from '../../utils/parse-request.js'
 
 export async function authRoutes(fastify: FastifyInstance) {
   const authService = new AuthService(fastify.prisma, fastify)
@@ -17,29 +9,21 @@ export async function authRoutes(fastify: FastifyInstance) {
   const loginRateLimit = Number(process.env.LOGIN_RATE_LIMIT_MAX) || 10
 
   fastify.post('/register', {
-    schema: registerSchema,
     config: { rateLimit: { max: Number(process.env.REGISTER_RATE_LIMIT_MAX) || 5, timeWindow: 60000 } },
-  }, async (request: FastifyRequest<{ Body: RegisterBody }>, reply) => {
-    // Manual validation to ensure schema works
-    const validationResult = registerSchema.safeParse({ body: request.body })
-    if (!validationResult.success) {
-      return reply.code(400).send({
-        error: 'Validación fallida',
-        details: validationResult.error.errors.map((e) => ({ field: e.path.join('.'), message: e.message })),
-      })
-    }
+  }, async (request, reply) => {
+    const input = parseRequest(registerSchema, request)
     try {
-      const result = await authService.register(request.body)
+      const result = await authService.register(input.body)
       reply.setCookie('refreshToken', result.refreshToken, {
         httpOnly: true,
         secure: isProd,
         sameSite: 'lax',
-        maxAge: 7 * 24 * 60 * 60 * 1000,
+        maxAge: 7 * 24 * 60 * 60,
         path: '/',
       })
       return reply.code(201).send({ accessToken: result.accessToken, user: result.user })
     } catch (err) {
-      if (errMessage(err) === 'EMAIL_EXISTS') {
+      if (err instanceof Error && err.message === 'EMAIL_EXISTS') {
         return reply.code(409).send({ error: 'Email ya registrado' })
       }
       throw err
@@ -47,31 +31,30 @@ export async function authRoutes(fastify: FastifyInstance) {
   })
 
   fastify.post('/login', {
-    schema: loginSchema,
     config: { rateLimit: { max: loginRateLimit, timeWindow: 60000 } },
-  }, async (request: FastifyRequest<{ Body: LoginBody }>, reply) => {
+  }, async (request, reply) => {
+    const input = parseRequest(loginSchema, request)
     try {
-      const result = await authService.login(request.body.email, request.body.password)
+      const result = await authService.login(input.body.email, input.body.password)
       reply.setCookie('refreshToken', result.refreshToken, {
         httpOnly: true,
         secure: isProd,
         sameSite: 'lax',
-        maxAge: 7 * 24 * 60 * 60 * 1000,
+        maxAge: 7 * 24 * 60 * 60,
         path: '/',
       })
       return { accessToken: result.accessToken, user: result.user }
     } catch (err) {
-      if (errMessage(err) === 'INVALID_CREDENTIALS') {
+      if (err instanceof Error && err.message === 'INVALID_CREDENTIALS') {
         return reply.code(401).send({ error: 'Credenciales inválidas' })
       }
       throw err
     }
   })
 
-  fastify.post('/refresh', {
-    schema: refreshSchema,
-  }, async (request: FastifyRequest<{ Body: RefreshBody }>, reply) => {
-    const refreshToken = request.body.refreshToken || request.cookies.refreshToken
+  fastify.post('/refresh', {}, async (request, reply) => {
+    const input = parseRequest(refreshSchema, request)
+    const refreshToken = input.body?.refreshToken || request.cookies.refreshToken
     if (!refreshToken) return reply.code(401).send({ error: 'Refresh token requerido' })
 
     try {
@@ -80,11 +63,11 @@ export async function authRoutes(fastify: FastifyInstance) {
         httpOnly: true,
         secure: isProd,
         sameSite: 'lax',
-        maxAge: 7 * 24 * 60 * 60 * 1000,
+        maxAge: 7 * 24 * 60 * 60,
         path: '/',
       })
       return { accessToken: result.accessToken, refreshToken: result.refreshToken, user: result.user }
-    } catch (err) {
+    } catch {
       reply.clearCookie('refreshToken', { path: '/' })
       return reply.code(401).send({ error: 'Sesión expirada, inicie sesión nuevamente' })
     }

@@ -28,6 +28,10 @@ export const updateAppointmentSchema = z.object({
   }),
 })
 
+export const idParamsSchema = z.object({
+  params: z.object({ id: z.string().uuid() }),
+})
+
 export const listAppointmentsSchema = z.object({
   query: z.object({
     specialistId: z.string().uuid().optional(),

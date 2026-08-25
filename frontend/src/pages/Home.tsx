@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import { useSpecialists } from '../hooks/useSpecialists';
 import type { Specialist } from '../hooks/useSpecialists';
 import { Card } from '../components/common/Card';
@@ -7,10 +8,11 @@ import { Loading } from '../components/common/Loading';
 import { ArrowRight, CalendarDays, ShieldCheck, Sparkles, Stethoscope } from 'lucide-react';
 
 export const Home = () => {
+  const navigate = useNavigate();
   const { data: specialists = [], isLoading, isError } = useSpecialists();
 
-  const handleBookAppointment = async (specialistId: string) => {
-    window.location.href = `/booking?specialist=${specialistId}`;
+  const handleBookAppointment = (specialistId: string) => {
+    navigate(`/booking?specialist=${specialistId}`);
   };
 
   if (isLoading) {
@@ -42,10 +44,10 @@ export const Home = () => {
               Encuentra especialistas de confianza y reserva tu próxima cita en pocos minutos.
             </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-              <Button onClick={() => { window.location.href = '/booking'; }} className="w-auto bg-cyan-300 text-slate-950 hover:bg-cyan-200">
+              <Button onClick={() => navigate('/booking')} className="w-auto bg-cyan-300 text-slate-950 hover:bg-cyan-200">
                 <CalendarDays className="h-4 w-4" /> Agendar una cita
               </Button>
-              <Button variant="ghost" onClick={() => { window.location.href = '/booking'; }} className="w-auto text-white hover:bg-white/10 hover:text-white">
+              <Button variant="ghost" onClick={() => navigate('/booking')} className="w-auto text-white hover:bg-white/10 hover:text-white">
                 Elegir tratamiento <ArrowRight className="h-4 w-4" />
               </Button>
             </div>
@@ -82,7 +84,7 @@ export const Home = () => {
           </a>
         </div>
 
-        {isError && specialists.length === 0 ? (
+        {isError ? (
           <div className="rounded-2xl border border-rose-200 bg-rose-50 px-6 py-8 text-center">
             <h3 className="font-semibold text-rose-900">No pudimos cargar los especialistas</h3>
             <p className="mt-2 text-sm text-rose-700">Comprueba que el servicio esté activo e inténtalo de nuevo.</p>
@@ -103,10 +105,9 @@ export const Home = () => {
                   </p>
 
                   <div className="flex flex-wrap gap-2 mb-4">
-                    {specialist.specialty &&
-                      specialist.specialty !== 'none' && (
-                        <Badge specialty={specialist.specialty as 'ortodoncia' | 'cirugia' | 'estetica'} />
-                      )}
+                    {specialist.specialty && (
+                      <Badge specialty={specialist.specialty as 'ortodoncia' | 'cirugia' | 'estetica'} />
+                    )}
                   </div>
 
                   <Button
@@ -135,10 +136,10 @@ export const Home = () => {
               </p>
             </div>
             <div className="flex flex-col gap-3 w-full sm:w-auto sm:flex-row">
-              <Button variant="primary" size="lg" onClick={() => window.location.href = '/booking'} className="gap-2">
+              <Button variant="primary" size="lg" onClick={() => navigate('/booking')} className="gap-2">
                 Agendar primera cita <ArrowRight className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="lg" onClick={() => window.location.href = '/specialists'} className="gap-2">
+              <Button variant="outline" size="lg" onClick={() => navigate('/specialists')} className="gap-2">
                 Ver especialistas <ArrowRight className="h-4 w-4" />
               </Button>
             </div>

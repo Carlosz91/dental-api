@@ -1,37 +1,34 @@
-import { FastifyInstance, FastifyRequest } from 'fastify'
+import { FastifyInstance } from 'fastify'
 import { AppointmentService } from './service.js'
-import { createAppointmentSchema, updateAppointmentSchema, listAppointmentsSchema } from './schemas.js'
-import { requireOwnershipOrStaff } from '../../middleware/auth.js'
-import { z } from 'zod'
-
-type CreateAppointmentBody = z.infer<typeof createAppointmentSchema>['body']
-type UpdateAppointmentParams = z.infer<typeof updateAppointmentSchema>['params']
-type UpdateAppointmentBody = z.infer<typeof updateAppointmentSchema>['body']
-
-function errMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
-}
+import { createAppointmentSchema, updateAppointmentSchema, listAppointmentsSchema, idParamsSchema } from './schemas.js'
+import { requireOwnershipOrStaff, optionalAuth } from '../../middleware/auth.js'
+import { parseRequest } from '../../utils/parse-request.js'
 
 export async function appointmentRoutes(fastify: FastifyInstance) {
   const service = new AppointmentService(fastify.prisma, fastify)
 
-  // Crear cita (paciente o admin)
+  // Crear cita (paciente logueado -> queda a su nombre; anónimo -> por teléfono)
   fastify.post('/', {
-    schema: createAppointmentSchema,
+    preHandler: [optionalAuth],
     config: { rateLimit: { max: 20, timeWindow: 60000 } },
-  }, async (request: FastifyRequest<{ Body: CreateAppointmentBody }>, reply) => {
+  }, async (request, reply) => {
+    const input = parseRequest(createAppointmentSchema, request)
     try {
       const appointment = await service.create({
-        ...request.body,
-        startsAt: new Date(request.body.startsAt),
-        endsAt: new Date(request.body.endsAt),
+        ...input.body,
+        startsAt: new Date(input.body.startsAt),
+        endsAt: new Date(input.body.endsAt),
         createdById: request.user?.id,
+        // Paciente autenticado -> la cita pertenece a SU cuenta
+        authUserId: request.user?.role === 'PATIENT' ? request.user.id : undefined,
       })
       return reply.code(201).send({ appointment })
     } catch (err) {
-      if (errMessage(err) === 'SPECIALIST_NOT_FOUND') return reply.code(404).send({ error: 'Especialista no encontrado' })
-      if (errMessage(err) === 'SLOT_CONFLICT') return reply.code(409).send({ error: 'El horario ya no está disponible' })
-      if (errMessage(err) === 'SPECIALTY_MISMATCH') return reply.code(400).send({ error: 'La especialidad no coincide con la del especialista' })
+      if (err instanceof Error) {
+        if (err.message === 'SPECIALIST_NOT_FOUND') return reply.code(404).send({ error: 'Especialista no encontrado' })
+        if (err.message === 'SLOT_CONFLICT') return reply.code(409).send({ error: 'El horario ya no está disponible' })
+        if (err.message === 'SPECIALTY_MISMATCH') return reply.code(400).send({ error: 'La especialidad no coincide con la del especialista' })
+      }
       throw err
     }
   })
@@ -39,30 +36,30 @@ export async function appointmentRoutes(fastify: FastifyInstance) {
   // Listar citas (con filtros)
   fastify.get('/', {
     preHandler: [fastify.authenticate],
-    schema: listAppointmentsSchema,
   }, async (request) => {
-    const { specialistId, patientId, status, specialty, from, to, page, limit } = request.query as any
+    const filters = parseRequest(listAppointmentsSchema, request)
 
     // Pacientes solo ven sus citas
-    const effectivePatientId = request.user!.role === 'PATIENT' ? request.user!.id : patientId
+    const effectivePatientId = request.user!.role === 'PATIENT' ? request.user!.id : filters.query.patientId
 
     return service.list({
-      specialistId,
+      specialistId: filters.query.specialistId,
       patientId: effectivePatientId,
-      status,
-      specialty,
-      from: from ? new Date(from) : undefined,
-      to: to ? new Date(to) : undefined,
-      page,
-      limit,
+      status: filters.query.status,
+      specialty: filters.query.specialty,
+      from: filters.query.from ? new Date(filters.query.from) : undefined,
+      to: filters.query.to ? new Date(filters.query.to) : undefined,
+      page: filters.query.page,
+      limit: filters.query.limit,
     })
   })
 
   // Detalle de cita
-  fastify.get<{ Params: UpdateAppointmentParams }>('/:id', {
+  fastify.get('/:id', {
     preHandler: [fastify.authenticate],
   }, async (request, reply) => {
-    const appointment = await service.findById(request.params.id)
+    const { params } = parseRequest(idParamsSchema, request)
+    const appointment = await service.findById(params.id)
     if (!appointment) return reply.code(404).send({ error: 'No encontrada' })
 
     // Ownership check
@@ -79,37 +76,55 @@ export async function appointmentRoutes(fastify: FastifyInstance) {
     return { appointment }
   })
 
-  // Actualizar cita
+  // Actualizar cita (solo dueño, especialista propio o staff)
   fastify.patch('/:id', {
     preHandler: [fastify.authenticate],
-    schema: updateAppointmentSchema,
-  }, async (request: FastifyRequest<{ Params: UpdateAppointmentParams; Body: UpdateAppointmentBody }>, reply) => {
+  }, async (request, reply) => {
+    const input = parseRequest(updateAppointmentSchema, request)
+
+    // Ownership check — prevents IDOR (patients editing other people's appointments)
+    const existing = await service.findById(input.params.id)
+    if (!existing) return reply.code(404).send({ error: 'No encontrada' })
+
+    if (request.user!.role === 'PATIENT' && existing.patientId !== request.user!.id) {
+      return reply.code(403).send({ error: 'Prohibido' })
+    }
+    if (request.user!.role === 'SPECIALIST') {
+      const spec = await fastify.prisma.specialist.findUnique({ where: { userId: request.user!.id } })
+      if (!spec || existing.specialistId !== spec.id) {
+        return reply.code(403).send({ error: 'Prohibido' })
+      }
+    }
+
     try {
       const appointment = await service.update(
-        request.params.id,
+        input.params.id,
         {
-          ...request.body,
-          startsAt: request.body.startsAt ? new Date(request.body.startsAt) : undefined,
-          endsAt: request.body.endsAt ? new Date(request.body.endsAt) : undefined,
+          ...input.body,
+          startsAt: input.body.startsAt ? new Date(input.body.startsAt) : undefined,
+          endsAt: input.body.endsAt ? new Date(input.body.endsAt) : undefined,
         },
         request.user!.id
       )
       return { appointment }
     } catch (err) {
-      if (errMessage(err) === 'NOT_FOUND') return reply.code(404).send({ error: 'No encontrada' })
-      if (errMessage(err) === 'INVALID_STATUS_TRANSITION') return reply.code(400).send({ error: 'Transición de estado inválida' })
-      if (errMessage(err) === 'SLOT_CONFLICT') return reply.code(409).send({ error: 'El nuevo horario ya no está disponible' })
+      if (err instanceof Error) {
+        if (err.message === 'NOT_FOUND') return reply.code(404).send({ error: 'No encontrada' })
+        if (err.message === 'INVALID_STATUS_TRANSITION') return reply.code(400).send({ error: 'Transición de estado inválida' })
+        if (err.message === 'SLOT_CONFLICT') return reply.code(409).send({ error: 'El nuevo horario ya no está disponible' })
+      }
       throw err
     }
   })
 
   // Historial de auditoría
-  fastify.get<{ Params: UpdateAppointmentParams }>('/:id/audit', {
+  fastify.get('/:id/audit', {
     preHandler: [fastify.requireRole('ADMIN', 'STAFF')],
   }, async (request, reply) => {
-    const appointment = await service.findById(request.params.id)
+    const { params } = parseRequest(idParamsSchema, request)
+    const appointment = await service.findById(params.id)
     if (!appointment) return reply.code(404).send({ error: 'No encontrada' })
-    const events = await service.getAuditEvents(request.params.id)
+    const events = await service.getAuditEvents(params.id)
     return { events }
   })
 }

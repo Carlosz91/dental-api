@@ -34,10 +34,30 @@ async function requireAuth(request: FastifyRequest, reply: FastifyReply) {
   }
 }
 
+/** Populates request.user when a valid token is present; never rejects */
+export async function optionalAuth(request: FastifyRequest) {
+  try {
+    await request.jwtVerify()
+  } catch {
+    // anonymous access — fine for public booking
+  }
+}
+
+// SECURITY: role comes from the DB, not the JWT — revoked/changed roles apply immediately
+async function freshRole(request: FastifyRequest): Promise<{ role: UserRole; isActive: boolean } | null> {
+  return request.server.prisma.user.findUnique({
+    where: { id: request.user.id },
+    select: { role: true, isActive: true },
+  })
+}
+
 function requireRole(...roles: UserRole[]) {
   return async (request: FastifyRequest, reply: FastifyReply) => {
     await requireAuth(request, reply)
-    if (!request.user || !roles.includes(request.user.role)) {
+    if (reply.sent) return
+
+    const dbUser = await freshRole(request)
+    if (!dbUser || !dbUser.isActive || !roles.includes(dbUser.role)) {
       reply.code(403).send({ error: 'Prohibido', message: 'Rol insuficiente' })
     }
   }
@@ -46,9 +66,15 @@ function requireRole(...roles: UserRole[]) {
 function requireOwnershipOrStaff(getResourceUserId: (request: FastifyRequest) => Promise<string>) {
   return async (request: FastifyRequest, reply: FastifyReply) => {
     await requireAuth(request, reply)
-    const resourceUserId = await getResourceUserId(request)
-    if (request.user!.role !== 'ADMIN' && request.user!.role !== 'STAFF' && request.user!.id !== resourceUserId) {
-      reply.code(403).send({ error: 'Prohibido', message: 'No tienes acceso a este recurso' })
+    if (reply.sent) return
+
+    const dbUser = await freshRole(request)
+    const isStaff = !!dbUser?.isActive && (dbUser.role === 'ADMIN' || dbUser.role === 'STAFF')
+    if (!isStaff) {
+      const resourceUserId = await getResourceUserId(request)
+      if (request.user!.id !== resourceUserId) {
+        reply.code(403).send({ error: 'Prohibido', message: 'No tienes acceso a este recurso' })
+      }
     }
   }
 }

@@ -15,6 +15,8 @@ export class AppointmentService {
     notes?: string
     source: string
     createdById?: string
+    /** When a PATIENT is logged in, the appointment belongs to THIS account */
+    authUserId?: string
   }) {
     // Verificar especialista activo
     const specialist = await this.prisma.specialist.findUnique({
@@ -27,24 +29,34 @@ export class AppointmentService {
       throw new Error('SPECIALTY_MISMATCH')
     }
 
-    // Buscar o crear paciente por teléfono
-    let patient = await this.prisma.user.findFirst({
-      where: { phone: data.patientPhone, role: 'PATIENT' },
-    })
-
-    if (!patient) {
-      patient = await this.prisma.user.create({
-        data: {
-          email: data.patientEmail || `patient-${data.patientPhone}@dental.local`,
-          passwordHash: '',
-          fullName: data.patientName,
-          phone: data.patientPhone,
-          role: 'PATIENT',
-          isActive: true,
-        },
+    // Resolver paciente:
+    // - Autenticado -> SIEMPRE su propia cuenta (el teléfono es solo contacto)
+    // - Anónimo (web pública) -> buscar/crear por teléfono
+    let patient
+    if (data.authUserId) {
+      patient = await this.prisma.user.findUnique({ where: { id: data.authUserId } })
+      if (!patient || patient.role !== 'PATIENT' || !patient.isActive) {
+        throw new Error('PATIENT_NOT_FOUND')
+      }
+    } else {
+      patient = await this.prisma.user.findFirst({
+        where: { phone: data.patientPhone, role: 'PATIENT' },
       })
-    } else if (data.patientEmail && patient.email !== data.patientEmail) {
-      await this.prisma.user.update({ where: { id: patient.id }, data: { email: data.patientEmail } })
+
+      if (!patient) {
+        patient = await this.prisma.user.create({
+          data: {
+            email: data.patientEmail || `patient-${data.patientPhone}@dental.local`,
+            passwordHash: '',
+            fullName: data.patientName,
+            phone: data.patientPhone,
+            role: 'PATIENT',
+            isActive: true,
+          },
+        })
+      } else if (data.patientEmail && patient.email !== data.patientEmail) {
+        await this.prisma.user.update({ where: { id: patient.id }, data: { email: data.patientEmail } })
+      }
     }
 
     // Crear cita (la constraint EXCLUDE en DB evita doble booking)

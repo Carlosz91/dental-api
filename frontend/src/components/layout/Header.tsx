@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ClipboardList, LogIn, LogOut, Menu, UserPlus, X } from 'lucide-react';
+import { ClipboardList, LogIn, LogOut, Menu, Stethoscope, UserPlus, X } from 'lucide-react';
 import { CornerLogo } from '../common/CornerLogo';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -37,6 +37,11 @@ export const Header = () => {
         <div className="absolute right-4 hidden items-center gap-2 md:flex sm:right-6">
           {user ? (
             <div className="flex items-center gap-2">
+              {['especialista', 'admin'].includes(user.role ?? '') && (
+                <Link to="/dashboard" className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-dental-700 hover:bg-dental-50">
+                  <Stethoscope className="h-4 w-4" /> Panel
+                </Link>
+              )}
               <Link to="/myappointments" className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-dental-700 hover:bg-dental-50">
                 <ClipboardList className="h-4 w-4" /> Mis citas
               </Link>

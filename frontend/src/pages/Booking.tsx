@@ -37,6 +37,7 @@ export const Booking = () => {
   const [patientName, setPatientName] = useState(user?.name || '');
   const [patientPhone, setPatientPhone] = useState(() => localStorage.getItem('dentalcare-phone') || '');
   const [message, setMessage] = useState('');
+  const [success, setSuccess] = useState(false);
 
   const { data: specialists = [], isLoading: specialistsLoading } = useSpecialists();
   const { data: availability, isLoading: availabilityLoading, refetch: refetchAvailability } = useAvailability(specialistId, selectedDate);
@@ -55,6 +56,15 @@ export const Booking = () => {
 
   const submitAppointment = async () => {
     setMessage('');
+    // TEMP DEBUG
+    console.log('[booking] submit ->', {
+      specialistId,
+      selectedDate,
+      slot: selectedSlot?.startsAt,
+      nombreLen: patientName.trim().length,
+      phoneLen: patientPhone.trim().length,
+      specialty: selectedSpecialist?.specialty,
+    });
     if (!specialistId || !selectedDate || !selectedSlot) {
       setMessage('Completa especialista, fecha y hora antes de confirmar.');
       return;
@@ -75,7 +85,9 @@ export const Booking = () => {
         patientName: patientName.trim(),
         patientPhone: patientPhone.trim(),
       });
-      navigate('/myappointments');
+      setSuccess(true);
+      // Dejamos ver la confirmación antes de ir al inicio
+      setTimeout(() => navigate('/'), 1500);
     } catch (err) {
       setMessage(apiErrorMessage(err, 'No se pudo reservar la cita.'));
       const status = (err as { response?: { status?: number } })?.response?.status;
@@ -240,13 +252,21 @@ export const Booking = () => {
                 <Input id="booking-phone" type="tel" label="Teléfono de contacto" value={patientPhone} onChange={(event) => setPatientPhone(event.target.value)} placeholder="+54 9 11 ..." autoComplete="tel" />
               </div>
 
-              {(message) && <p className="mt-4 text-sm text-rose-600" role="alert">{message}</p>}
+              {success ? (
+                <p className="mt-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700" role="status">
+                  ✅ ¡Cita registrada con éxito! Te llevamos al inicio...
+                </p>
+              ) : message ? (
+                <p className="mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700" role="alert">
+                  {message}
+                </p>
+              ) : null}
 
               <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <button type="button" onClick={() => setStep(3)} className="inline-flex items-center justify-center gap-2 text-sm font-semibold text-dental-600"><ChevronLeft className="h-4 w-4" /> Editar horario</button>
+                <button type="button" onClick={() => setStep(3)} disabled={success} className="inline-flex items-center justify-center gap-2 text-sm font-semibold text-dental-600"><ChevronLeft className="h-4 w-4" /> Editar horario</button>
                 <div className="flex flex-col items-stretch gap-2 sm:items-end">
-                  <Button className="w-full sm:w-auto" disabled={isCreating} onClick={() => void submitAppointment()}>
-                    {isCreating ? 'Reservando...' : 'Confirmar'} <CheckCircle2 className="h-4 w-4" />
+                  <Button className="w-full sm:w-auto" disabled={isCreating || success} onClick={() => void submitAppointment()}>
+                    {isCreating ? 'Reservando...' : success ? 'Registrada' : 'Confirmar'} <CheckCircle2 className="h-4 w-4" />
                   </Button>
                 </div>
               </div>

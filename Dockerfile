@@ -13,8 +13,7 @@ FROM deps AS builder
 COPY prisma ./prisma/
 RUN npx prisma generate
 COPY . .
-# tsc reports pre-existing type errors but still emits JS; fail only if nothing was emitted
-RUN npm run build; test -d dist
+RUN npm run build
 
 # Test stage (defined before runner so the image default CMD runs the server)
 FROM deps AS test

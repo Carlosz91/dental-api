@@ -1,109 +1,126 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { axiosInstance } from '../lib/api';
+import { axiosInstance, setAccessToken } from '../lib/api';
 
 export type UserRole = 'paciente' | 'admin' | null;
 
-interface AuthState {
-  user: {
-    id: string;
-    name: string;
-    email: string;
-    role: UserRole;
-  } | null;
-  isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, phone: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
-  refreshToken: () => Promise<void>;
-  setUser: (user: NonNullable<AuthState['user']>) => void;
+interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  specialistId?: string | null;
 }
 
-export const useAuth = create(
-  persist<AuthState>(
-    (set, get) => ({
-      user: null,
-      isLoading: false,
+interface AuthState {
+  user: AuthUser | null;
+  isLoading: boolean; // true while restoring the session on boot
+  restoreSession: () => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  register: (data: { name: string; email: string; phone?: string; password: string }) => Promise<void>;
+  logout: () => Promise<void>;
+}
 
-      login: async (email: string, password: string) => {
-        try {
-          const response = await axiosInstance.post('/auth/login', {
-            email,
-            password,
-          });
+/** Backend user shape (login/refresh/me responses) */
+interface ApiUser {
+  id: string;
+  email: string;
+  fullName?: string | null;
+  name?: string | null;
+  role?: string;
+  specialistId?: string | null;
+}
 
-          const { user: apiUser, token } = response.data;
+function normalizeUser(apiUser: ApiUser): AuthUser {
+  return {
+    id: String(apiUser?.id ?? ''),
+    name: String(apiUser?.fullName || apiUser?.name || apiUser?.email || 'Usuario'),
+    email: String(apiUser?.email ?? ''),
+    role: (typeof apiUser?.role === 'string'
+      ? (apiUser.role.toLowerCase() as UserRole)
+      : null) as UserRole,
+    specialistId: apiUser?.specialistId ?? null,
+  };
+}
 
-          // Normalizamos la forma del usuario del backend (usa `fullName`)
-          // al contrato interno de la app ({ id, name, email, role })
-          const normalizedUser = {
-            id: String(apiUser?.id ?? ''),
-            name: String(apiUser?.fullName || apiUser?.name || apiUser?.email || 'Usuario'),
-            email: String(apiUser?.email ?? ''),
-            role: (typeof apiUser?.role === 'string'
-              ? (apiUser.role.toLowerCase() as UserRole)
-              : null) as UserRole,
-          };
+// Singleton so React 18 StrictMode double-effects don't double-refresh
+let restorePromise: Promise<void> | null = null;
 
-          localStorage.setItem('token', token);
-          localStorage.setItem('user', JSON.stringify(normalizedUser));
+// One-time hygiene: purge legacy localStorage session keys from old builds
+['dental-auth', 'token', 'user'].forEach((key) => localStorage.removeItem(key));
 
-          set({ user: normalizedUser });
-          axiosInstance.setAuthToken(token);
-        } catch (error: any) {
-          throw new Error(error.response?.data?.message || 'Error en el login');
-        }
-      },
+export const useAuth = create<AuthState>()((set) => ({
+  user: null,
+  isLoading: true,
 
-      register: async (name: string, email: string, phone: string, password: string) => {
-        try {
-          const response = await axiosInstance.post('/auth/register', {
-            name,
-            email,
-            phone,
-            password,
-          });
-          const { user, token } = response.data;
-          localStorage.setItem('token', token);
-          localStorage.setItem('user', JSON.stringify(user));
-          set({ user, isLoading: false });
-        } catch (error: any) {
-          throw new Error(error.response?.data?.message || 'Error en el registro');
-        }
-      },
+  /**
+   * Boot-time session restore: the httpOnly refresh cookie is the ONLY
+   * persisted credential. No localStorage involved anywhere.
+   */
+  restoreSession: () => {
+    if (restorePromise) return restorePromise;
 
-      logout: async () => {
-        try {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          await axiosInstance.post('/auth/logout');
-          set({ user: null });
-        } catch (error: any) {
-          // Even if API fails, clear local state
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          set({ user: null });
-          throw error;
-        }
-      },
+    restorePromise = (async () => {
+      set({ isLoading: true });
+      try {
+        // Exchange refresh cookie for a fresh in-memory access token.
+        // Empty object avoids Fastify's FST_ERR_CTP_EMPTY_JSON_BODY (json CT + no body).
+        const refreshed = await axiosInstance.post('/auth/refresh', {});
+        setAccessToken(refreshed.data.accessToken);
 
-      refreshToken: async () => {
-        try {
-          const response = await axiosInstance.post('/auth/refresh');
-          const { token } = response.data;
-          localStorage.setItem('token', token);
-        } catch (error: any) {
-          // Token refresh failed, logout
-          await get().logout();
-          throw error;
-        }
-      },
+        const me = await axiosInstance.get('/auth/me');
+        set({ user: normalizeUser(me.data.user), isLoading: false });
+      } catch {
+        setAccessToken(null);
+        set({ user: null, isLoading: false });
+      }
+    })();
 
-      setUser: (user: NonNullable<AuthState['user']>) => set({ user, isLoading: false }),
-    }),
-    {
-      name: 'dental-auth',
-      // Customize how state is persisted
+    return restorePromise;
+  },
+
+  login: async (email: string, password: string) => {
+    try {
+      const response = await axiosInstance.post('/auth/login', { email, password });
+      const { accessToken, user } = response.data;
+
+      setAccessToken(accessToken);
+      set({ user: normalizeUser(user) });
+    } catch (error: unknown) {
+      const message =
+        (error as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+        'Error en el login';
+      throw new Error(message);
     }
-  )
-);
+  },
+
+  register: async (data) => {
+    try {
+      const response = await axiosInstance.post('/auth/register', {
+        email: data.email,
+        password: data.password,
+        fullName: data.name,
+        phone: data.phone || undefined,
+      });
+      const { accessToken, user } = response.data;
+      setAccessToken(accessToken);
+      set({ user: normalizeUser(user) });
+    } catch (error: unknown) {
+      const message =
+        (error as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+        'No se pudo crear la cuenta';
+      throw new Error(message);
+    }
+  },
+
+  logout: async () => {
+    try {
+      // Revoke the refresh token server-side (cookie cleared by API)
+      await axiosInstance.post('/auth/logout');
+    } catch {
+      // Local state is cleared regardless — never trap the user in a session
+    } finally {
+      setAccessToken(null);
+      set({ user: null });
+    }
+  },
+}));

@@ -46,15 +46,12 @@ export const useSpecialists = () => {
       if (isDemoMode) {
         return exampleSpecialists;
       }
-      try {
-        const response = await axiosInstance.get('/specialists');
-        const list: ApiSpecialist[] = response.data?.specialists ?? response.data;
-        return list.filter((s) => s.isActive !== false).map(mapApiSpecialist);
-      } catch {
-        return exampleSpecialists;
-      }
+      // NO silent fallback: if the API fails we show the error state,
+      // never fake doctors that can't be booked.
+      const response = await axiosInstance.get('/specialists');
+      const list: ApiSpecialist[] = response.data?.specialists ?? response.data;
+      return list.filter((s) => s.isActive !== false).map(mapApiSpecialist);
     },
-    initialData: exampleSpecialists,
     retry: false,
     staleTime: 60000,
     refetchInterval: 30000,

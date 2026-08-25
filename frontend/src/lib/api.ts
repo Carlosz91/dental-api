@@ -1,57 +1,93 @@
 import axios from 'axios';
 
-// Set base URL - will be proxied through Vite config
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
-export const isDemoMode = import.meta.env.VITE_USE_DEMO_DATA !== 'false';
+// Same-origin by default: Vite proxies /api -> http://localhost:3000,
+// which keeps session cookies first-party (SameSite works, no CORS needed).
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+// Demo mode is OPT-IN now that the real backend exists
+export const isDemoMode = import.meta.env.VITE_USE_DEMO_DATA === 'true';
+
+/**
+ * SECURITY: the access token lives ONLY in memory (module scope).
+ * Nothing session-related touches localStorage.
+ * Page reloads restore the session via the httpOnly refresh cookie
+ * (silent POST /auth/refresh on boot).
+ */
+let accessToken: string | null = null;
+
+export function setAccessToken(token: string | null): void {
+  accessToken = token;
+}
+
+/** Subscribers are notified when the session can't be restored/refreshed */
+const sessionExpiredListeners = new Set<() => void>();
+
+export function onSessionExpired(listener: () => void): () => void {
+  sessionExpiredListeners.add(listener);
+  return () => sessionExpiredListeners.delete(listener);
+}
 
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  withCredentials: true,
-  timeout: 2500,
+  withCredentials: true, // sends the httpOnly refresh cookie
+  timeout: 15000,
 });
 
-// Add request interceptor for auth token
 axiosInstance.interceptors.request.use(
   (config) => {
-    // Get token from localStorage
-    const token = localStorage.getItem('token');
-    if (token && !config.url?.includes('/auth/')) {
-      config.headers.Authorization = `Bearer ${token}`;
+    // Attach whenever we hold a token. Sending an expired one to /auth/login
+    // or /auth/refresh is harmless — those routes ignore headers.
+    // (Never filter by URL here: /auth/me NEEDS the Bearer!)
+    if (accessToken) {
+      config.headers.Authorization = `Bearer ${accessToken}`;
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Add response interceptor for token refresh on 401
+// Silent refresh on 401, then retry the original request once.
+// SINGLE-FLIGHT: concurrent 401s share ONE refresh call — critical because
+// every successful refresh ROTATES the refresh token (parallel rotations fail).
+let inflightRefresh: Promise<string | null> | null = null;
+
+async function refreshAccessToken(): Promise<string | null> {
+  if (!inflightRefresh) {
+    inflightRefresh = axiosInstance
+      .post('/auth/refresh', {}) // {} avoids FST_ERR_CTP_EMPTY_JSON_BODY
+      .then((response) => {
+        setAccessToken(response.data.accessToken);
+        return response.data.accessToken as string;
+      })
+      .catch((refreshError) => {
+        // Session truly expired
+        setAccessToken(null);
+        sessionExpiredListeners.forEach((listener) => listener());
+        throw refreshError;
+      })
+      .finally(() => {
+        inflightRefresh = null;
+      });
+  }
+  try {
+    return await inflightRefresh;
+  } catch {
+    return null;
+  }
+}
+
 axiosInstance.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    // If 401 and we haven't tried to refresh yet
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    const isAuthUrl = originalRequest?.url?.includes('/auth/');
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthUrl) {
       originalRequest._retry = true;
 
-      try {
-        // Refresh token endpoint
-        const response = await axiosInstance.post('/auth/refresh');
-        const { token } = response.data;
-
-        // Update auth token for future requests
-        localStorage.setItem('token', token);
-
-        // Retry original request with new token
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
         return axiosInstance(originalRequest);
-      } catch (refreshError) {
-        // Refresh token failed, logout user
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        // Dispatch logout from zustand store if available
-        originalRequest._retry = true; // Prevent infinite loop
-        throw refreshError;
       }
     }
 
@@ -59,8 +95,5 @@ axiosInstance.interceptors.response.use(
   }
 );
 
-// Export axiosInstance as named export for use in other modules
 export { axiosInstance };
-
-// Default export also for convenience
 export default axiosInstance;

@@ -1,184 +1,125 @@
 import { useState } from 'react';
-import { useAuth } from '../hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { Input } from '../components/common/Input';
 import { Button } from '../components/common/Button';
-import { registerSchema } from '../lib/validations';
-import { checkPasswordStrength } from '../lib/validations';
+import { useAuth } from '../hooks/useAuth';
 
 export const Register = () => {
   const { register, user } = useAuth();
   const navigate = useNavigate();
-  const [formState, setFormState] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    password: '',
-    confirmPassword: '',
-  });
-  const [passwordStrength, setPasswordStrength] = useState<
-    | 'weak'
-    | 'medium'
-    | 'strong'
-  >('weak');
 
-  const onSubmit = async (values: typeof registerSchema._type) => {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  if (user) {
+    return <Navigate to="/" replace />;
+  }
+
+  const passwordStrengthLabel = (password.length >= 8)
+    ? (/[A-Z]/.test(password) && /\d/.test(password) ? 'Fuerte' : 'Media')
+    : 'Débil';
+
+  const onSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError('');
+
+    if (!name.trim() || !email.trim() || !password) {
+      setError('Completá nombre, correo y contraseña.');
+      return;
+    }
+    if (password.length < 8) {
+      setError('La contraseña necesita al menos 8 caracteres.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError('Las contraseñas no coinciden.');
+      return;
+    }
+
+    setSubmitting(true);
     try {
-      await register(values.name, values.email, values.phone, values.password);
+      await register({ name: name.trim(), email: email.trim(), phone: phone.trim(), password });
       navigate('/');
-    } catch (error: any) {
-      // Error handling
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'No se pudo crear la cuenta.');
+    } finally {
+      setSubmitting(false);
     }
   };
-
-  // Validate on submit
-  const validation = registerSchema.safeParse(formState);
-  if (!validation.success) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-dental-50">
-        <div className="bg-white rounded-3xl p-8 max-w-md w-full animate-slide-in-right">
-          <h2 className="text-2xl font-bold text-dental-900 mb-6">Regístrate</h2>
-          <form onSubmit={(e) => { e.preventDefault(); void onSubmit(formState); }} className="space-y-6">
-            <Input
-              id="name"
-              placeholder="Nombre completo"
-              label="Nombre completo"
-              value={formState.name}
-              onChange={(e) =>
-                setFormState({ ...formState, name: e.target.value })
-              }
-            />
-            <Input
-              id="email"
-              type="email"
-              placeholder="correo@ejemplo.com"
-              label="Correo electrónico"
-              value={formState.email}
-              onChange={(e) =>
-                setFormState({ ...formState, email: e.target.value })
-              }
-            />
-            <Input
-              id="phone"
-              type="tel"
-              placeholder="+52 55 1234 5678"
-              label="Teléfono"
-              value={formState.phone}
-              onChange={(e) =>
-                setFormState({ ...formState, phone: e.target.value })
-              }
-            />
-            <Input
-              id="password"
-              type="password"
-              placeholder="••••••••"
-              label="Contraseña"
-              value={formState.password}
-              onChange={(e) => {
-                setFormState({ ...formState, password: e.target.value });
-                setPasswordStrength(checkPasswordStrength(e.target.value).level);
-              }}
-            />
-            <div className="mt-2 text-dental-500 text-xs">
-              {passwordStrength && checkPasswordStrength(formState.password).level === 'weak' && (
-                <span>Mínimo 6 caracteres, incluye mayúsculas y números</span>
-              )}
-            </div>
-
-            <Input
-              id="confirmPassword"
-              type="password"
-              placeholder="••••••••"
-              label="Confirmar contraseña"
-              value={formState.confirmPassword}
-              onChange={(e) =>
-                setFormState({ ...formState, confirmPassword: e.target.value })
-              }
-            />
-            {validation.error && (
-              <p className="text-dental-600 text-sm mt-2">
-                {validation.error.errors.map((e) => e.message).join('. ')}
-              </p>
-            )}
-            <Button variant="primary" type="submit">
-              Regístrate
-            </Button>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
-  // If already logged in, redirect to home
-  if (user) {
-    navigate('/');
-    return null;
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-dental-50">
       <div className="bg-white rounded-3xl p-8 max-w-md w-full animate-slide-in-right">
-        <h2 className="text-2xl font-bold text-dental-900 mb-6">Regístrate</h2>
-        <form onSubmit={(e) => { e.preventDefault(); void onSubmit(formState); }} className="space-y-6">
+        <h2 className="text-2xl font-bold text-dental-900 mb-6">Creá tu cuenta</h2>
+        <form onSubmit={onSubmit} className="space-y-4">
           <Input
-            id="name"
-            placeholder="Nombre completo"
+            id="reg-name"
+            type="text"
+            placeholder="Tu nombre completo"
             label="Nombre completo"
-            value={formState.name}
-            onChange={(e) =>
-              setFormState({ ...formState, name: e.target.value })
-            }
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            autoComplete="name"
           />
           <Input
-            id="email"
+            id="reg-email"
             type="email"
             placeholder="correo@ejemplo.com"
             label="Correo electrónico"
-            value={formState.email}
-            onChange={(e) =>
-              setFormState({ ...formState, email: e.target.value })
-            }
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
           />
           <Input
-            id="phone"
+            id="reg-phone"
             type="tel"
-            placeholder="+52 55 1234 5678"
-            label="Teléfono"
-            value={formState.phone}
-            onChange={(e) =>
-              setFormState({ ...formState, phone: e.target.value })
-            }
+            placeholder="+54 9 11 ..."
+            label="Teléfono (opcional)"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            autoComplete="tel"
           />
           <Input
-            id="password"
+            id="reg-password"
             type="password"
             placeholder="••••••••"
             label="Contraseña"
-            value={formState.password}
-            onChange={(e) => {
-              setFormState({ ...formState, password: e.target.value });
-              setPasswordStrength(checkPasswordStrength(e.target.value).level);
-            }}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="new-password"
           />
-          <div className="mt-2 text-dental-500 text-xs">
-            {passwordStrength && checkPasswordStrength(formState.password).level === 'weak' && (
-              <span>Mínimo 6 caracteres, incluye mayúsculas y números</span>
-            )}
-          </div>
-
+          {password && (
+            <p className="text-xs text-slate-500">Seguridad de la contraseña: {passwordStrengthLabel}</p>
+          )}
           <Input
-            id="confirmPassword"
+            id="reg-confirm"
             type="password"
-            placeholder="••••••••"
+            placeholder="Repetí la contraseña"
             label="Confirmar contraseña"
-            value={formState.confirmPassword}
-            onChange={(e) =>
-              setFormState({ ...formState, confirmPassword: e.target.value })
-            }
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            autoComplete="new-password"
           />
-          <Button variant="primary" type="submit">
-            Regístrate
+
+          {error && (
+            <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700" role="alert">
+              {error}
+            </p>
+          )}
+
+          <Button variant="primary" type="submit" disabled={submitting}>
+            {submitting ? 'Creando cuenta...' : 'Crear cuenta'}
           </Button>
+
+          <p className="text-center text-sm text-slate-500">
+            ¿Ya tenés cuenta?{' '}
+            <a href="/login" className="font-semibold text-dental-600 hover:text-dental-800">Iniciá sesión</a>
+          </p>
         </form>
       </div>
     </div>

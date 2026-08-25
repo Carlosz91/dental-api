@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useSpecialists } from '../hooks/useSpecialists';
 import { Card } from '../components/common/Card';
 import { Badge } from '../components/common/Badge';
@@ -7,6 +8,7 @@ import { Button } from '../components/common/Button';
 import type { Specialist } from '../hooks/useSpecialists';
 
 export const Specialists = () => {
+  const navigate = useNavigate();
   const { data: specialists = [], isLoading } = useSpecialists();
   const [search, setSearch] = React.useState('');
   const [selectedSpecialty, setSelectedSpecialty] = React.useState<'ortodoncia' | 'cirugia' | 'estetica' | ''>( '');
@@ -21,7 +23,7 @@ export const Specialists = () => {
   });
 
   const handleBook = (specialistId: string) => {
-    window.location.href = `/specialist/${specialistId}`;
+    navigate(`/specialist/${specialistId}`);
   };
 
   if (isLoading) {

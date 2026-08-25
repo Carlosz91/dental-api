@@ -1,13 +1,8 @@
-import { FastifyInstance, FastifyRequest } from 'fastify'
-import { PrismaClient, UserRole } from '@prisma/client'
+import { FastifyInstance } from 'fastify'
+import { UserRole } from '@prisma/client'
 import { hashPassword } from '../../utils/password.js'
 import { createSpecialistSchema, updateSpecialistSchema, specialistParamsSchema } from './schemas.js'
-import { z } from 'zod'
-
-type SpecialistIdParams = z.infer<typeof specialistParamsSchema>['params']
-type CreateSpecialistBody = z.infer<typeof createSpecialistSchema>['body']
-type UpdateSpecialistParams = z.infer<typeof updateSpecialistSchema>['params']
-type UpdateSpecialistBody = z.infer<typeof updateSpecialistSchema>['body']
+import { parseRequest } from '../../utils/parse-request.js'
 
 export async function specialistRoutes(fastify: FastifyInstance) {
   // Listar especialistas activos (público)
@@ -24,9 +19,10 @@ export async function specialistRoutes(fastify: FastifyInstance) {
   })
 
   // Detalle especialista
-  fastify.get('/:id', { schema: specialistParamsSchema }, async (request: FastifyRequest<{ Params: SpecialistIdParams }>, reply) => {
+  fastify.get('/:id', async (request, reply) => {
+    const { id } = parseRequest(specialistParamsSchema, request).params
     const specialist = await fastify.prisma.specialist.findUnique({
-      where: { id: request.params.id },
+      where: { id },
       include: {
         user: { select: { fullName: true, email: true, phone: true } },
         availabilityRules: { where: { effectiveTo: null }, orderBy: { weekday: 'asc' } },
@@ -39,24 +35,23 @@ export async function specialistRoutes(fastify: FastifyInstance) {
   // Crear especialista (ADMIN)
   fastify.post('/', {
     preHandler: [fastify.requireRole('ADMIN')],
-    schema: createSpecialistSchema,
-  }, async (request: FastifyRequest<{ Body: CreateSpecialistBody }>, reply) => {
-    const { email, password, fullName, licenseNumber, specialty, phone, bio } = request.body
+  }, async (request, reply) => {
+    const { body } = parseRequest(createSpecialistSchema, request)
 
-    const existingUser = await fastify.prisma.user.findUnique({ where: { email } })
+    const existingUser = await fastify.prisma.user.findUnique({ where: { email: body.email } })
     if (existingUser) return reply.code(409).send({ error: 'Email ya existe' })
 
-    const existingLicense = await fastify.prisma.specialist.findUnique({ where: { licenseNumber } })
+    const existingLicense = await fastify.prisma.specialist.findUnique({ where: { licenseNumber: body.licenseNumber } })
     if (existingLicense) return reply.code(409).send({ error: 'Número de matrícula ya existe' })
 
-    const passwordHash = await hashPassword(password)
+    const passwordHash = await hashPassword(body.password)
 
     const user = await fastify.prisma.user.create({
-      data: { email, passwordHash, fullName, phone, role: UserRole.SPECIALIST },
+      data: { email: body.email, passwordHash, fullName: body.fullName, phone: body.phone, role: UserRole.SPECIALIST },
     })
 
     const specialist = await fastify.prisma.specialist.create({
-      data: { userId: user.id, licenseNumber, specialty, bio },
+      data: { userId: user.id, licenseNumber: body.licenseNumber, specialty: body.specialty, bio: body.bio },
       include: { user: { select: { fullName: true, email: true } } },
     })
 
@@ -66,10 +61,11 @@ export async function specialistRoutes(fastify: FastifyInstance) {
   // Actualizar especialista (ADMIN o el mismo especialista)
   fastify.patch('/:id', {
     preHandler: [fastify.authenticate],
-    schema: updateSpecialistSchema,
-  }, async (request: FastifyRequest<{ Params: UpdateSpecialistParams; Body: UpdateSpecialistBody }>, reply) => {
+  }, async (request, reply) => {
+    const { params, body } = parseRequest(updateSpecialistSchema, request)
+
     const specialist = await fastify.prisma.specialist.findUnique({
-      where: { id: request.params.id },
+      where: { id: params.id },
       include: { user: true },
     })
     if (!specialist) return reply.code(404).send({ error: 'No encontrado' })
@@ -80,7 +76,7 @@ export async function specialistRoutes(fastify: FastifyInstance) {
     }
 
     // Separar campos de User y Specialist
-    const { phone, fullName, email, ...specialistData } = request.body
+    const { phone, fullName, email, ...specialistData } = body
 
     // Actualizar User si hay campos de usuario
     if (phone !== undefined || fullName !== undefined || email !== undefined) {
@@ -92,7 +88,7 @@ export async function specialistRoutes(fastify: FastifyInstance) {
 
     // Actualizar Specialist con el resto de campos
     const updated = await fastify.prisma.specialist.update({
-      where: { id: request.params.id },
+      where: { id: params.id },
       data: specialistData,
       include: { user: { select: { fullName: true, email: true, phone: true } } },
     })
@@ -103,9 +99,9 @@ export async function specialistRoutes(fastify: FastifyInstance) {
   // Eliminar especialista (ADMIN)
   fastify.delete('/:id', {
     preHandler: [fastify.requireRole('ADMIN')],
-    schema: specialistParamsSchema,
-  }, async (request: FastifyRequest<{ Params: SpecialistIdParams }>, reply) => {
-    await fastify.prisma.specialist.delete({ where: { id: request.params.id } })
+  }, async (request, reply) => {
+    const { id } = parseRequest(specialistParamsSchema, request).params
+    await fastify.prisma.specialist.delete({ where: { id } })
     return { message: 'Especialista eliminado' }
   })
 }
