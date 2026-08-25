@@ -1,203 +1,157 @@
-# Dental API
+# 🦷 DentalCare — Sistema de gestión odontológica
 
-Backend para sistema de agendamiento de turnos odontológicos con 3 especialidades: **Ortodoncia**, **Cirugía** y **Estética**.
+**Monorepo** con la API y la web del sistema de turnos: los pacientes agendan online y cada odontólogo cuenta con su panel profesional de agenda.
 
-## Stack
+- **Ortodoncia · Cirugía · Estética**
+- Turnos con control anti-solapamiento a nivel de base de datos
+- Sesiones seguras: access token en memoria + refresh rotativo en cookie httpOnly
 
-- **Runtime**: Node.js 20 + TypeScript
-- **Framework**: Fastify (alto performance, validation built-in)
-- **Database**: PostgreSQL 16 + Prisma ORM
-- **Auth**: JWT (access 15min + refresh 7d rotativo) + bcrypt (12 rounds)
-- **Security**: Helmet, CORS, Rate Limiting (@fastify/rate-limit)
-- **Validation**: Zod (schemas en todos los endpoints)
-- **Docs**: Swagger/OpenAPI (@fastify/swagger)
-- **Tests**: Vitest + Supertest
-- **Container**: Docker + Docker Compose
+---
 
-## Arquitectura
+## 📁 Estructura del repo
 
 ```
-┌─────────────┐     HTTPS/TLS      ┌─────────────┐
-│   Cliente   │ ◄────────────────► │   API GW    │  (nginx/Cloudflare)
-│  (PWA/React)│                    │  (Rate LMT) │
-└─────────────┘                    └──────┬──────┘
-                                           │
-                    ┌──────────────────────┼──────────────────────┐
-                    ▼                      ▼                      ▼
-             ┌─────────────┐         ┌─────────────┐         ┌─────────────┐
-             │  Auth Svc   │         │  Booking    │         │ Specialist  │
-             │  (JWT+bcrypt)│        │  Svc (Core) │         │  Svc (CRUD) │
-             └──────┬──────┘         └──────┬──────┘         └──────┬──────┘
-                    │                       │                       │
-                    ▼                       ▼                       ▼
-             ┌─────────────────────────────────────────────────────────────┐
-             │              PostgreSQL (schemas: auth, booking,            │
-             │              specialist, audit)                             │
-             └─────────────────────────────────────────────────────────────┘
+dental-api/
+├── src/                  ← Backend (Fastify + TypeScript + Prisma)
+│   ├── modules/          ← auth · specialists · availability · appointments
+│   ├── plugins/          ← prisma, jwt, rate-limit, swagger
+│   ├── middleware/       ← authenticate, requireRole, error-handler
+│   └── utils/            ← slots (agenda), parse-request, password
+├── prisma/               ← schema + migraciones + seed
+├── tests/                ← suite Vitest
+├── frontend/             ← Web (React 19 + Vite + Tailwind)
+│   └── src/
+│       ├── pages/        ← Home, Booking, MyAppointments, Dashboard...
+│       ├── components/   ← UI compartida (Button, Card, Header...)
+│       └── hooks/        ← useAuth, useAppointments, useSpecialists...
+├── scripts/create-admin.ts
+└── docker-compose.yml    ← postgres + api
 ```
 
-### Esquema de datos clave
+## 🧰 Stack
 
-- **User**: Pacientes, Staff, Admin, Especialistas
-- **Specialist**: Perfil profesional + matrícula + especialidad
-- **AvailabilityRule**: Reglas semanales de horarios por especialista
-- **BlockedSlot**: Bloqueos puntuales (vacaciones, mantenimiento)
-- **Appointment**: Turnos con constraint `EXCLUDE` anti-double-booking a nivel DB
-- **AuditEvent**: Trazabilidad inmutable de cambios de estado
-- **RefreshToken**: Hash SHA-256 en DB, rotación automática
+| Capa | Tecnologías |
+|------|-------------|
+| **Backend** | Node.js 20, Fastify, TypeScript, Prisma ORM |
+| **Base de datos** | PostgreSQL 16 (Docker) |
+| **Auth** | JWT access 15 min + refresh rotativo 7 días (SHA-256 en DB), bcrypt(12) |
+| **Validación** | Zod en todos los endpoints (400 con detalle de campo) |
+| **Seguridad** | Helmet, CORS, Rate Limiting por capa, guardas de rol re-verificadas contra DB |
+| **Frontend** | React 19, Vite, Tailwind CSS, React Router v6, TanStack Query, Zustand, Axios |
+| **Docs** | Swagger/OpenAPI en `/docs` (solo fuera de producción) |
 
-## Seguridad implementada
+---
 
-| Capa | Medida |
-|------|--------|
-| **Red** | TLS 1.3, HSTS, CSP via Helmet |
-| **Edge** | Rate limit global 100/min/IP, Auth 10/min/IP, Booking 20/min |
-| **Auth** | Access token 15m (HS256), Refresh 7d rotativo + hash en DB |
-| **Cookies** | `HttpOnly; Secure; SameSite=Lax` para refresh token |
-| **Passwords** | bcrypt 12 rounds (configurable) |
-| **Validación** | Zod en body/query/params de todos los endpoints |
-| **DB** | Constraint `EXCLUDE` evita doble booking sin locks aplicativos |
-| **Concurrencia** | Optimistic locking (`version` en appointment) |
-| **Auditoría** | Trigger-level en service, append-only |
-| **RBAC** | `PATIENT`/`STAFF`/`ADMIN`/`SPECIALIST` + ownership checks |
+## 🚀 Inicio rápido
 
-## Endpoints principales
+### 1) Backend + Base de datos (Docker)
 
-| Método | Endpoint | Auth | Descripción |
-|--------|----------|------|-------------|
-| POST | `/api/v1/auth/register` | — | Registro paciente |
-| POST | `/api/v1/auth/login` | — | Login → cookie + accessToken |
-| POST | `/api/v1/auth/refresh` | — | Renovar access token |
-| POST | `/api/v1/auth/logout` | ✓ | Cerrar sesión |
-| GET | `/api/v1/auth/me` | ✓ | Perfil actual |
-| GET | `/api/v1/specialists` | — | Lista pública de especialistas |
-| GET | `/api/v1/specialists/:id` | — | Detalle especialista |
-| POST | `/api/v1/specialists` | ADMIN | Crear especialista |
-| GET | `/api/v1/availability/:specialistId/slots?date=...` | — | Slots disponibles |
-| POST | `/api/v1/availability/:specialistId/rules` | ADMIN/STAFF | Crear regla disponibilidad |
-| POST | `/api/v1/availability/:specialistId/blocks` | ADMIN/STAFF/SPECIALIST | Bloquear horario |
-| POST | `/api/v1/appointments` | — | Crear cita |
-| GET | `/api/v1/appointments` | ✓ | Listar con filtros |
-| GET | `/api/v1/appointments/:id` | ✓ | Detalle |
-| PATCH | `/api/v1/appointments/:id` | ✓ | Cambiar estado/reagendar |
-| GET | `/api/v1/appointments/:id/audit` | ADMIN/STAFF | Historial de auditoría |
-
-## Flujo de estados de cita
-
-```
-PENDIENTE → CONFIRMADO → EN_CURSO → FINALIZADO
-    │           │           │
-    └───────────┴───────────┴──→ CANCELADO
-    │
-    └─────────────────────────→ NO_ASISTIO
-```
-
-## Inicio rápido
-
-### 1. Clonar y configurar
 ```bash
-git clone https://github.com/Carlosz91/dental-api.git
-cd dental-api
-cp .env.example .env
-# Editar .env con tus secrets reales (JWT secrets, etc.)
+cp .env.example .env         # completar JWT_ACCESS_SECRET y JWT_REFRESH_SECRET (≥32 chars)
+docker compose up -d --build # levanta postgres + api en :3000
+docker compose exec api npx prisma migrate deploy
+docker compose exec api npx tsx prisma/seed.ts
 ```
 
-### 2. Levantar base de datos
-```bash
-docker compose up -d postgres
-```
+- API: `http://localhost:3000`
+- Swagger: `http://localhost:3000/docs` (solo `NODE_ENV=development`)
 
-### 3. Instalar dependencias y migrar
+### 2) Frontend
+
 ```bash
+cd frontend
 npm install
-npx prisma generate
-npx prisma migrate dev --name init
+npm run dev                  # http://localhost:5173
 ```
 
-### 4. (Opcional) Seed de datos de prueba
-```bash
-npm run db:seed
+El proxy de Vite redirige `/api/*` → `http://localhost:3000` (cookies first-party, sin CORS).
+
+> Para exponer el front en tu red local: `npm run dev -- --host 0.0.0.0 --port 3002`
+
+### 👤 Usuarios sembrados
+
+| Usuario | Email | Rol |
+|---------|-------|-----|
+| Administrador | `admin@dental.com` | ADMIN |
+| Recepción | `staff@dental.com` | STAFF |
+| Dra. María González | `ortodoncia@dental.com` | SPECIALIST |
+| Dr. Carlos Rodríguez | `cirugia@dental.com` | SPECIALIST |
+| Dra. Ana Martínez | `estetica@dental.com` | SPECIALIST |
+| Juan Pérez | `paciente@test.com` | PATIENT |
+
+Contraseña de todos: **`Test1234!`** — ⚠️ solo para desarrollo.
+
+Días de atención (hora Argentina): Ortodoncia lun/mié/vie 8–14 · Cirugía mar/jue 9–13 · Estética lun–vie 10–18.
+
+---
+
+## 📜 Scripts
+
+### Raíz / backend
+
+| Comando | Qué hace |
+|---------|----------|
+| `npm run create-admin` | Asistente interactivo para crear/promover ADMIN o STAFF |
+| `npm run dev` | Servidor con recarga (tsx watch) |
+| `npm run build` / `start` | Compila a `dist/` y sirve producción |
+| `npm test` | Suite Vitest (40 tests) |
+| `npm run prisma:migrate` | Migraciones en desarrollo |
+
+### `frontend/`
+
+| Comando | Qué hace |
+|---------|----------|
+| `npm run dev` | Vite con HMR |
+| `npm run build` / `preview` | Build de producción y previsualización |
+| `npm run lint` | Oxlint |
+
+---
+
+## 🔐 Roles
+
+| Acción | PATIENT | SPECIALIST | STAFF | ADMIN |
+|--------|:--:|:--:|:--:|:--:|
+| Ver especialistas / disponibilidad | ✅ | ✅ | ✅ | ✅ |
+| Agendar cita | ✅ (a su nombre) | ✅ | ✅ | ✅ |
+| Ver / confirmar / cancelar citas | ✅ propias | ✅ su agenda | ✅ todas | ✅ todas |
+| Crear/editar especialistas | ❌ | ❌ | ❌ | ✅ |
+| Reglas de horarios / bloqueos | ❌ | ✅ propios | ✅ | ✅ |
+| Auditoría de citas | ❌ | ❌ | ✅ | ✅ |
+
+La sesión vive **solo en memoria** del navegador: se restaura vía cookie httpOnly (`/auth/refresh`) y expira tras **2 minutos de inactividad**.
+
+---
+
+## 🔒 Seguridad implementada
+
+- bcrypt(12) · access token 15 min · refresh rotativo hasheado con revocación
+- Validación **real** con Zod en cada endpoint (rechaza y strippea campos desconocidos → sin mass assignment)
+- Anti-IDOR: ownership checks en lectura/escritura + roles re-verificados contra DB en cada request protegida
+- Rate limiting por capa (auth 10/min, registro 5/min, global configurable)
+- Secretos exigidos al boot (JWT ≥ 32 caracteres, `COOKIE_SECRET` obligatorio en producción)
+- Helmet activo en producción · Swagger oculto en producción · errores internos nunca viajan al cliente
+
+---
+
+## 🗺️ API v1 (resumen)
+
 ```
-Crea: 1 admin, 1 staff, 3 especialistas (uno por especialidad), reglas de disponibilidad, 1 paciente de prueba.
-
-### 5. Desarrollo
-```bash
-npm run dev
-```
-- API: http://localhost:3000
-- Swagger UI: http://localhost:3000/docs
-- Health: http://localhost:3000/health
-
-## Testing
-
-```bash
-# Levantar Postgres de test (puerto 5433)
-docker run -d --name postgres-test \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=dental_test \
-  -p 5433:5432 postgres:16-alpine
-
-# Correr tests
-DATABASE_URL="postgresql://postgres:postgres@localhost:5433/dental_test?schema=public" npm test
-
-# Con cobertura
-npm run test:coverage
-
-# Watch mode
-npm run test:watch
+POST /api/v1/auth/register|login|refresh|logout     GET /api/v1/auth/me
+GET  /api/v1/specialists            (público)
+POST/PATCH/DELETE /api/v1/specialists/:id           (ADMIN)
+GET  /api/v1/availability/:specialistId/slots?date= (público)
+CRUD /api/v1/availability/...rules|blocks           (STAFF/ADMIN/SPECIALIST*)
+POST /api/v1/appointments                           (público con auth opcional)
+GET/PATCH /api/v1/appointments/:id                  (dueño o staff)
+GET  /api/v1/appointments/:id/audit                 (ADMIN/STAFF)
 ```
 
-### Cobertura de tests
+Anti doble-turno garantizado por constraint `EXCLUDE` en PostgreSQL + respuesta `409` amigable.
 
-| Módulo | Tests | Qué cubre |
-|--------|-------|-----------|
-| **Auth** | 8 | Register, login, refresh rotation, reuse detection, me, validation |
-| **Specialists** | 6 | List, create (admin), update (own/admin), forbid, inactive filter |
-| **Availability** | 7 | Slots generation, appointments block, blockedSlots, CRUD rules/blocks, authz |
-| **Appointments** | 10 | Book, race condition, list (own/all), status transitions, reschedule, audit |
-| **Rate Limit** | 2 | Login limit, headers |
-| **Concurrency** | 1 | 20 concurrent requests → solo 1 éxito (DB EXCLUDE constraint) |
-| **Integration** | 2 | Flujo completo book→confirm→start→finish + cancel→audit→slot libre |
+---
 
-**Total: ~36 tests** que validan seguridad, reglas de negocio, concurrencia y flujos reales.
+## 📦 Deploy (notas)
 
-## Docker Production
-
-```bash
-# Build multi-stage
-docker build -t dental-api .
-
-# Run con docker-compose (incluye postgres)
-docker compose up -d
-```
-
-## Variables de entorno
-
-| Variable | Requerida | Default | Descripción |
-|----------|-----------|---------|-------------|
-| `DATABASE_URL` | ✅ | — | Conexión PostgreSQL |
-| `JWT_ACCESS_SECRET` | ✅ | — | Secreto access token (min 32 chars) |
-| `JWT_REFRESH_SECRET` | ✅ | — | Secreto refresh token (distinto al anterior) |
-| `JWT_ACCESS_TTL` | ❌ | `15m` | Expiración access token |
-| `JWT_REFRESH_TTL` | ❌ | `7d` | Expiración refresh token |
-| `BCRYPT_ROUNDS` | ❌ | `12` | Rounds de bcrypt |
-| `PORT` | ❌ | `3000` | Puerto del servidor |
-| `NODE_ENV` | ❌ | `development` | Entorno |
-| `FRONTEND_URL` | ❌ | `http://localhost:5173` | Origen CORS |
-| `RATE_LIMIT_MAX` | ❌ | `100` | Requests por ventana global |
-| `RATE_LIMIT_WINDOW_MS` | ❌ | `60000` | Ventana en ms |
-
-## Próximos pasos sugeridos
-
-- [ ] Notificaciones: Email (Resend) + WhatsApp (Twilio) para recordatorios
-- [ ] PWA Frontend: React + Vite + TanStack Query + shadcn/ui
-- [ ] Sync CalDAV con Google/Outlook/Apple Calendar
-- [ ] Lista de espera automática
-- [ ] Pagos online (MercadoPago/Stripe)
-- [ ] Multi-clínica (RLS en PostgreSQL)
-- [ ] Métricas: Prometheus + Grafana + OpenTelemetry
-
-## Licencia
-
-MIT
+- `NODE_ENV=production` exige `COOKIE_SECRET` y activa CSP estricta; oculta `/docs`
+- Detrás de proxy: `TRUST_PROXY=true`
+- Aplicar migraciones con `npx prisma migrate deploy` en cada release
