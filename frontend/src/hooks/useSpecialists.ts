@@ -18,6 +18,27 @@ export const exampleSpecialists: Specialist[] = [
 
 const exampleSlots = ['09:00', '10:30', '12:00', '16:00', '17:30'];
 
+// Normaliza la respuesta del backend (/specialists devuelve { specialists: [...] })
+// al formato que espera la UI ({ id, name, description, specialty })
+interface ApiSpecialist {
+  id: string;
+  bio?: string;
+  description?: string;
+  specialty?: string;
+  isActive?: boolean;
+  user?: { fullName?: string };
+}
+
+function mapApiSpecialist(raw: ApiSpecialist): Specialist {
+  return {
+    id: raw.id,
+    name: raw.user?.fullName || 'Especialista',
+    description: raw.bio || raw.description || '',
+    specialty: ((raw.specialty || 'estetica') as string).toLowerCase() as Specialist['specialty'],
+    availability: {},
+  };
+}
+
 export const useSpecialists = () => {
   return useQuery({
     queryKey: ['specialists'],
@@ -27,7 +48,8 @@ export const useSpecialists = () => {
       }
       try {
         const response = await axiosInstance.get('/specialists');
-        return response.data as Specialist[];
+        const list: ApiSpecialist[] = response.data?.specialists ?? response.data;
+        return list.filter((s) => s.isActive !== false).map(mapApiSpecialist);
       } catch {
         return exampleSpecialists;
       }
@@ -68,17 +90,30 @@ export const useAvailability = (specialistId: string, date: string) => {
         return { slots: exampleSlots };
       }
       try {
+        // Endpoint real del backend: GET /availability/:specialistId/slots?date=YYYY-MM-DD
         const response = await axiosInstance.get(
-          `/availability?specialistId=${specialistId}&date=${date}`
+          `/availability/${specialistId}/slots?date=${date}`
         );
-        return response.data as { slots: string[] };
+        const rawSlots: Array<{
+          startsAt: string;
+          available?: boolean;
+        }> = response.data?.slots ?? [];
+
+        // Solo horas realmente libres; HH:mm tomado del ISO (UTC, igual que genera el backend)
+        const slots = rawSlots
+          .filter((slot) => slot.available !== false)
+          .map((slot) => slot.startsAt.slice(11, 16));
+
+        return { slots };
       } catch {
-        return { slots: exampleSlots };
+        // Si el backend falla, mejor lista vacía que horas inventadas
+        return { slots: [] as string[] };
       }
     },
-    placeholderData: { slots: exampleSlots },
+    placeholderData: { slots: [] as string[] },
     retry: false,
     staleTime: 30000,
+    refetchInterval: 30000,
     enabled: !!specialistId && !!date,
   });
 };

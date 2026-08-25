@@ -1,13 +1,27 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { CalendarDays, ClipboardList, LogIn, Menu, UserPlus, X } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ClipboardList, LogIn, LogOut, Menu, UserPlus, X } from 'lucide-react';
 import { CornerLogo } from '../common/CornerLogo';
 import { useAuth } from '../../hooks/useAuth';
 
 export const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const closeMenu = () => setIsMenuOpen(false);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch {
+      // El store ya limpia el estado local aunque el API falle
+    }
+    closeMenu();
+    navigate('/');
+  };
+
+  // Defensivo: sesiones persistidas antes de la normalización pueden no tener `name`
+  const firstName = (user?.name ?? '').trim().split(' ')[0] || 'usuario';
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/95 shadow-sm backdrop-blur-lg">
@@ -23,13 +37,20 @@ export const Header = () => {
         <div className="absolute right-4 hidden items-center gap-2 md:flex sm:right-6">
           {user ? (
             <div className="flex items-center gap-2">
-              <Link to="/booking" className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-dental-700 hover:bg-dental-50">
-                <CalendarDays className="h-4 w-4" /> Agendar cita
-              </Link>
               <Link to="/myappointments" className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-dental-700 hover:bg-dental-50">
                 <ClipboardList className="h-4 w-4" /> Mis citas
               </Link>
-              <span className="px-3 text-sm text-slate-500">Hola, {user.name}</span>
+              <span className="px-1 text-sm font-medium text-slate-600">
+                Hola, {firstName}
+              </span>
+              <button
+                type="button"
+                onClick={() => void handleLogout()}
+                className="inline-flex items-center gap-2 rounded-xl border border-dental-200 px-3 py-2 text-sm font-semibold text-dental-700 transition-colors hover:bg-dental-50"
+                title="Cerrar sesión"
+              >
+                <LogOut className="h-4 w-4" /> Salir
+              </button>
             </div>
           ) : (
             <div className="flex items-center gap-2">
@@ -65,12 +86,19 @@ export const Header = () => {
 
           {user ? (
             <div className="grid gap-2 border-b border-dental-100 pb-5">
-              <Link to="/booking" onClick={closeMenu} className="flex items-center gap-2 rounded-xl bg-dental-50 px-4 py-3 font-semibold text-dental-700">
-                <CalendarDays className="h-4 w-4" /> Agendar cita
-              </Link>
-              <Link to="/myappointments" onClick={closeMenu} className="flex items-center gap-2 rounded-xl px-4 py-3 font-semibold text-dental-700 hover:bg-dental-50">
+              <span className="px-1 text-sm font-medium text-slate-600">
+                Hola, {firstName}
+              </span>
+              <Link to="/myappointments" onClick={closeMenu} className="flex items-center gap-2 rounded-xl bg-dental-50 px-4 py-3 font-semibold text-dental-700">
                 <ClipboardList className="h-4 w-4" /> Mis citas
               </Link>
+              <button
+                type="button"
+                onClick={() => void handleLogout()}
+                className="flex items-center justify-center gap-2 rounded-xl border border-dental-200 px-4 py-3 font-semibold text-dental-700 transition-colors hover:bg-dental-50"
+              >
+                <LogOut className="h-4 w-4" /> Salir
+              </button>
             </div>
           ) : (
             <div className="grid gap-2 border-t border-dental-100 pt-5">

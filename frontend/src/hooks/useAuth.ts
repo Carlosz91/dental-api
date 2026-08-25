@@ -32,11 +32,24 @@ export const useAuth = create(
             password,
           });
 
-          const { user, token } = response.data;
-          localStorage.setItem('token', token);
-          localStorage.setItem('user', JSON.stringify(user));
+          const { user: apiUser, token } = response.data;
 
-          set({ user });
+          // Normalizamos la forma del usuario del backend (usa `fullName`)
+          // al contrato interno de la app ({ id, name, email, role })
+          const normalizedUser = {
+            id: String(apiUser?.id ?? ''),
+            name: String(apiUser?.fullName || apiUser?.name || apiUser?.email || 'Usuario'),
+            email: String(apiUser?.email ?? ''),
+            role: (typeof apiUser?.role === 'string'
+              ? (apiUser.role.toLowerCase() as UserRole)
+              : null) as UserRole,
+          };
+
+          localStorage.setItem('token', token);
+          localStorage.setItem('user', JSON.stringify(normalizedUser));
+
+          set({ user: normalizedUser });
+          axiosInstance.setAuthToken(token);
         } catch (error: any) {
           throw new Error(error.response?.data?.message || 'Error en el login');
         }
