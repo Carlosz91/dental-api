@@ -82,35 +82,54 @@ export const useSpecialistDetail = (specialistId: string) => {
   });
 };
 
+export interface AvailabilitySlot {
+  /** ISO instant (UTC) — send this back when booking */
+  startsAt: string;
+  endsAt: string;
+  /** HH:mm in clinic timezone for display */
+  label: string;
+}
+
 export const useAvailability = (specialistId: string, date: string) => {
   return useQuery({
     queryKey: ['availability', specialistId, date],
     queryFn: async () => {
       if (isDemoMode || specialistId.startsWith('demo-')) {
-        return { slots: exampleSlots };
+        return {
+          slots: exampleSlots.map((label) => ({
+            startsAt: `${date}T${label}:00-03:00`,
+            endsAt: `${date}T${label}:30-03:00`,
+            label,
+          })),
+        };
       }
       try {
-        // Endpoint real del backend: GET /availability/:specialistId/slots?date=YYYY-MM-DD
+        // Real backend endpoint: GET /availability/:specialistId/slots?date=YYYY-MM-DD
         const response = await axiosInstance.get(
           `/availability/${specialistId}/slots?date=${date}`
         );
         const rawSlots: Array<{
           startsAt: string;
+          endsAt?: string;
+          label?: string;
           available?: boolean;
         }> = response.data?.slots ?? [];
 
-        // Solo horas realmente libres; HH:mm tomado del ISO (UTC, igual que genera el backend)
         const slots = rawSlots
           .filter((slot) => slot.available !== false)
-          .map((slot) => slot.startsAt.slice(11, 16));
+          .map((slot) => ({
+            startsAt: slot.startsAt,
+            endsAt: slot.endsAt || new Date(new Date(slot.startsAt).getTime() + 30 * 60000).toISOString(),
+            label: slot.label || slot.startsAt.slice(11, 16),
+          }));
 
         return { slots };
       } catch {
-        // Si el backend falla, mejor lista vacía que horas inventadas
-        return { slots: [] as string[] };
+        // If the API fails show an empty agenda rather than invented hours
+        return { slots: [] as AvailabilitySlot[] };
       }
     },
-    placeholderData: { slots: [] as string[] },
+    placeholderData: { slots: [] as AvailabilitySlot[] },
     retry: false,
     staleTime: 30000,
     refetchInterval: 30000,

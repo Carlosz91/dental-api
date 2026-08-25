@@ -1,9 +1,19 @@
 import dayjs from 'dayjs'
+import utc from 'dayjs/plugin/utc.js'
+import timezone from 'dayjs/plugin/timezone.js'
 import { PrismaClient, AvailabilityRule, Appointment, BlockedSlot } from '@prisma/client'
+
+dayjs.extend(utc)
+dayjs.extend(timezone)
+
+// Business hours are defined in clinic-local time; stored instants are UTC.
+export const BUSINESS_TZ = 'America/Argentina/Buenos_Aires'
 
 export interface TimeSlot {
   startsAt: Date
   endsAt: Date
+  /** HH:mm label in BUSINESS_TZ, ready for UI display */
+  label: string
   available: boolean
   appointmentId?: string
   blocked?: boolean
@@ -15,29 +25,26 @@ export async function calculateAvailableSlots(
   specialistId: string,
   date: Date
 ): Promise<TimeSlot[]> {
-  // Use dayjs to get the day of week from the date string to avoid timezone issues
-  const dateStr = date.toISOString().split('T')[0]
-  const dayOfWeek = dayjs(dateStr).day() // 0=Dom
-
-  // Create a Date at start of day UTC for consistent Prisma comparisons
-  const queryDate = dayjs(dateStr).startOf('day').toDate()
+  const dateStr = typeof date === 'string' ? date : date.toISOString().split('T')[0]
+  const zonedDate = dayjs.tz(dateStr, BUSINESS_TZ)
+  const dayOfWeek = zonedDate.day() // 0=Dom
 
   // 1. Reglas de disponibilidad vigentes
   const rules = await prisma.availabilityRule.findMany({
     where: {
       specialistId,
       weekday: dayOfWeek,
-      effectiveFrom: { lte: queryDate },
-      OR: [{ effectiveTo: null }, { effectiveTo: { gte: queryDate } }],
+      effectiveFrom: { lte: zonedDate.toDate() },
+      OR: [{ effectiveTo: null }, { effectiveTo: { gte: zonedDate.toDate() } }],
     },
     orderBy: { startTime: 'asc' },
   })
 
   if (rules.length === 0) return []
 
-  // 2. Citas existentes ese día (no canceladas/no asistió)
-  const dayStart = dayjs(dateStr).startOf('day').toDate()
-  const dayEnd = dayjs(dateStr).endOf('day').toDate()
+  // 2. Citas existentes ese día (no canceladas/no asistió), en instantes absolutos
+  const dayStart = zonedDate.startOf('day').toDate()
+  const dayEnd = zonedDate.endOf('day').toDate()
 
   const appointments = await prisma.appointment.findMany({
     where: {
@@ -57,23 +64,23 @@ export async function calculateAvailableSlots(
     },
   })
 
-  // 4. Generar slots
+  // 4. Generar slots en hora de clínica y convertir a instants UTC
   const slots: TimeSlot[] = []
 
   for (const rule of rules) {
     const [startH, startM] = rule.startTime.split(':').map(Number)
     const [endH, endM] = rule.endTime.split(':').map(Number)
 
-    let current = dayjs(dateStr).hour(startH).minute(startM)
-    const limit = dayjs(dateStr).hour(endH).minute(endM)
+    let current = zonedDate.hour(startH).minute(startM)
+    const limit = zonedDate.hour(endH).minute(endM)
 
-    // Check if slot END time is <= limit (original logic was: current.add(slotMinutes).isSameOrBefore(limit))
     while (true) {
       const slotEnd = current.add(rule.slotMinutes, 'minute')
       if (slotEnd.isAfter(limit)) break
 
       const slotStart = current.toDate()
       const slotEndDate = slotEnd.toDate()
+      const label = current.format('HH:mm')
 
       // ¿Hay cita que se solape con este slot? (overlap real, no igualdad exacta)
       const appointment = appointments.find(
@@ -88,6 +95,7 @@ export async function calculateAvailableSlots(
       slots.push({
         startsAt: slotStart,
         endsAt: slotEndDate,
+        label,
         available: !appointment && !block,
         appointmentId: appointment?.id,
         blocked: !!block,

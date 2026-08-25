@@ -9,7 +9,11 @@ const rateLimitPlugin: FastifyPluginAsync = async (fastify) => {
     timeWindow: Number(process.env.RATE_LIMIT_WINDOW_MS) || 60000,
     keyGenerator: (request) => request.ip,
     allowList: ['127.0.0.1', '::1'],
-    errorMessage: 'Demasiadas peticiones, intente más tarde',
+    errorResponseBuilder: () => ({
+      code: 429,
+      error: 'Too Many Requests',
+      message: 'Demasiadas peticiones, intente más tarde',
+    }),
     addHeaders: {
       'x-ratelimit-limit': true,
       'x-ratelimit-remaining': true,
@@ -23,7 +27,11 @@ const rateLimitPlugin: FastifyPluginAsync = async (fastify) => {
     max: 10,
     timeWindow: 60000,
     keyGenerator: (request) => `auth:${request.ip}`,
-    errorMessage: 'Demasiados intentos de autenticación',
+    errorResponseBuilder: () => ({
+      code: 429,
+      error: 'Too Many Requests',
+      message: 'Demasiados intentos de autenticación',
+    }),
   })
 }
 

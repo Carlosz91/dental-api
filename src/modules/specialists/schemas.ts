@@ -16,6 +16,7 @@ export const updateSpecialistSchema = z.object({
   params: z.object({ id: z.string().uuid() }),
   body: z.object({
     fullName: z.string().min(2).max(120).optional(),
+    email: z.string().email().optional(),
     licenseNumber: z.string().min(5).max(40).optional(),
     specialty: z.enum(['ORTODONCIA', 'CIRUGIA', 'ESTETICA']).optional(),
     phone: z.string().max(30).optional(),

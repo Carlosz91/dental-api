@@ -1,7 +1,15 @@
-import { FastifyInstance } from 'fastify'
+import { FastifyInstance, FastifyRequest } from 'fastify'
 import { calculateAvailableSlots } from '../../utils/slots.js'
 import { createAvailabilitySchema, updateAvailabilitySchema, blockedSlotSchema } from './schemas.js'
 import { z } from 'zod'
+
+type CreateRuleParams = z.infer<typeof createAvailabilitySchema>['params']
+type CreateRuleBody = z.infer<typeof createAvailabilitySchema>['body']
+type UpdateRuleParams = z.infer<typeof updateAvailabilitySchema>['params']
+type UpdateRuleBody = z.infer<typeof updateAvailabilitySchema>['body']
+type BlockSlotParams = z.infer<typeof blockedSlotSchema>['params']
+type BlockSlotBody = z.infer<typeof blockedSlotSchema>['body']
+type IdParams = { specialistId: string; id: string }
 
 export async function availabilityRoutes(fastify: FastifyInstance) {
   // GET slots disponibles para una fecha
@@ -37,7 +45,7 @@ export async function availabilityRoutes(fastify: FastifyInstance) {
     fastify.post('/:specialistId/rules', {
       preHandler: [fastify.requireRole('ADMIN', 'STAFF')],
       schema: createAvailabilitySchema,
-    }, async (request, reply) => {
+    }, async (request: FastifyRequest<{ Params: CreateRuleParams; Body: CreateRuleBody }>, reply) => {
       // Manual validation to ensure refine works
       const validationResult = createAvailabilitySchema.safeParse({ params: request.params, body: request.body })
       if (!validationResult.success) {
@@ -56,7 +64,7 @@ export async function availabilityRoutes(fastify: FastifyInstance) {
     fastify.patch('/:specialistId/rules/:id', {
       preHandler: [fastify.requireRole('ADMIN', 'STAFF')],
       schema: updateAvailabilitySchema,
-    }, async (request, reply) => {
+    }, async (request: FastifyRequest<{ Params: UpdateRuleParams; Body: UpdateRuleBody }>, reply) => {
       const validationResult = updateAvailabilitySchema.safeParse({ params: request.params, body: request.body })
       if (!validationResult.success) {
         return reply.code(400).send({
@@ -75,7 +83,7 @@ export async function availabilityRoutes(fastify: FastifyInstance) {
     fastify.delete('/:specialistId/rules/:id', {
       preHandler: [fastify.requireRole('ADMIN')],
       schema: z.object({ params: z.object({ specialistId: z.string().uuid(), id: z.string().uuid() }) }),
-    }, async (request, reply) => {
+    }, async (request: FastifyRequest<{ Params: IdParams }>, reply) => {
       await fastify.prisma.availabilityRule.delete({ where: { id: request.params.id } })
       return { message: 'Regla eliminada' }
     })
@@ -84,7 +92,7 @@ export async function availabilityRoutes(fastify: FastifyInstance) {
     fastify.post('/:specialistId/blocks', {
       preHandler: [fastify.requireRole('ADMIN', 'STAFF', 'SPECIALIST')],
       schema: blockedSlotSchema,
-    }, async (request, reply) => {
+    }, async (request: FastifyRequest<{ Params: BlockSlotParams; Body: BlockSlotBody }>, reply) => {
       const validationResult = blockedSlotSchema.safeParse({ params: request.params, body: request.body })
       if (!validationResult.success) {
         return reply.code(400).send({
@@ -113,7 +121,7 @@ export async function availabilityRoutes(fastify: FastifyInstance) {
     fastify.delete('/:specialistId/blocks/:id', {
       preHandler: [fastify.requireRole('ADMIN', 'STAFF', 'SPECIALIST')],
       schema: z.object({ params: z.object({ specialistId: z.string().uuid(), id: z.string().uuid() }) }),
-    }, async (request, reply) => {
+    }, async (request: FastifyRequest<{ Params: IdParams }>, reply) => {
       await fastify.prisma.blockedSlot.delete({ where: { id: request.params.id } })
       return { message: 'Bloqueo eliminado' }
     })

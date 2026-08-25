@@ -10,9 +10,6 @@ export interface AuthUser {
 }
 
 declare module 'fastify' {
-  interface FastifyRequest {
-    user?: AuthUser
-  }
   interface FastifyInstance {
     requireAuth: (request: FastifyRequest, reply: FastifyReply) => Promise<void>
     requireRole: (...roles: UserRole[]) => (request: FastifyRequest, reply: FastifyReply) => Promise<void>
@@ -20,10 +17,18 @@ declare module 'fastify' {
   }
 }
 
+// Official @fastify/jwt augmentation: types both the signed payload and
+// `request.user` after jwtVerify(), without clashing with its own declaration.
+declare module '@fastify/jwt' {
+  interface FastifyJWT {
+    payload: { id: string; email: string; role: UserRole }
+    user: AuthUser
+  }
+}
+
 async function requireAuth(request: FastifyRequest, reply: FastifyReply) {
   try {
     await request.jwtVerify()
-    request.user = request.user as AuthUser
   } catch {
     reply.code(401).send({ error: 'No autorizado' })
   }

@@ -1,8 +1,16 @@
-import { FastifyInstance } from 'fastify'
+import { FastifyInstance, FastifyRequest } from 'fastify'
 import { AppointmentService } from './service.js'
 import { createAppointmentSchema, updateAppointmentSchema, listAppointmentsSchema } from './schemas.js'
 import { requireOwnershipOrStaff } from '../../middleware/auth.js'
 import { z } from 'zod'
+
+type CreateAppointmentBody = z.infer<typeof createAppointmentSchema>['body']
+type UpdateAppointmentParams = z.infer<typeof updateAppointmentSchema>['params']
+type UpdateAppointmentBody = z.infer<typeof updateAppointmentSchema>['body']
+
+function errMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err)
+}
 
 export async function appointmentRoutes(fastify: FastifyInstance) {
   const service = new AppointmentService(fastify.prisma, fastify)
@@ -11,7 +19,7 @@ export async function appointmentRoutes(fastify: FastifyInstance) {
   fastify.post('/', {
     schema: createAppointmentSchema,
     config: { rateLimit: { max: 20, timeWindow: 60000 } },
-  }, async (request, reply) => {
+  }, async (request: FastifyRequest<{ Body: CreateAppointmentBody }>, reply) => {
     try {
       const appointment = await service.create({
         ...request.body,
@@ -21,9 +29,9 @@ export async function appointmentRoutes(fastify: FastifyInstance) {
       })
       return reply.code(201).send({ appointment })
     } catch (err) {
-      if (err.message === 'SPECIALIST_NOT_FOUND') return reply.code(404).send({ error: 'Especialista no encontrado' })
-      if (err.message === 'SLOT_CONFLICT') return reply.code(409).send({ error: 'El horario ya no está disponible' })
-      if (err.message === 'SPECIALTY_MISMATCH') return reply.code(400).send({ error: 'La especialidad no coincide con la del especialista' })
+      if (errMessage(err) === 'SPECIALIST_NOT_FOUND') return reply.code(404).send({ error: 'Especialista no encontrado' })
+      if (errMessage(err) === 'SLOT_CONFLICT') return reply.code(409).send({ error: 'El horario ya no está disponible' })
+      if (errMessage(err) === 'SPECIALTY_MISMATCH') return reply.code(400).send({ error: 'La especialidad no coincide con la del especialista' })
       throw err
     }
   })
@@ -51,7 +59,7 @@ export async function appointmentRoutes(fastify: FastifyInstance) {
   })
 
   // Detalle de cita
-  fastify.get('/:id', {
+  fastify.get<{ Params: UpdateAppointmentParams }>('/:id', {
     preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const appointment = await service.findById(request.params.id)
@@ -75,7 +83,7 @@ export async function appointmentRoutes(fastify: FastifyInstance) {
   fastify.patch('/:id', {
     preHandler: [fastify.authenticate],
     schema: updateAppointmentSchema,
-  }, async (request, reply) => {
+  }, async (request: FastifyRequest<{ Params: UpdateAppointmentParams; Body: UpdateAppointmentBody }>, reply) => {
     try {
       const appointment = await service.update(
         request.params.id,
@@ -88,15 +96,15 @@ export async function appointmentRoutes(fastify: FastifyInstance) {
       )
       return { appointment }
     } catch (err) {
-      if (err.message === 'NOT_FOUND') return reply.code(404).send({ error: 'No encontrada' })
-      if (err.message === 'INVALID_STATUS_TRANSITION') return reply.code(400).send({ error: 'Transición de estado inválida' })
-      if (err.message === 'SLOT_CONFLICT') return reply.code(409).send({ error: 'El nuevo horario ya no está disponible' })
+      if (errMessage(err) === 'NOT_FOUND') return reply.code(404).send({ error: 'No encontrada' })
+      if (errMessage(err) === 'INVALID_STATUS_TRANSITION') return reply.code(400).send({ error: 'Transición de estado inválida' })
+      if (errMessage(err) === 'SLOT_CONFLICT') return reply.code(409).send({ error: 'El nuevo horario ya no está disponible' })
       throw err
     }
   })
 
   // Historial de auditoría
-  fastify.get('/:id/audit', {
+  fastify.get<{ Params: UpdateAppointmentParams }>('/:id/audit', {
     preHandler: [fastify.requireRole('ADMIN', 'STAFF')],
   }, async (request, reply) => {
     const appointment = await service.findById(request.params.id)

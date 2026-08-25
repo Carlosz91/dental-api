@@ -37,7 +37,10 @@ const jwtPlugin: FastifyPluginAsync = async (fastify) => {
 
   fastify.decorate('verifyRefresh', async (request, reply) => {
     try {
-      await request.jwtVerify({ secret: process.env.JWT_REFRESH_SECRET! })
+      // @fastify/jwt's public typings don't expose the per-call `secret` override,
+      // but the runtime options merge supports it (refresh flow + tests rely on it).
+      const refreshOptions = { secret: process.env.JWT_REFRESH_SECRET! } as unknown as Parameters<typeof request.jwtVerify>[0]
+      await request.jwtVerify(refreshOptions)
     } catch (err) {
       reply.code(401).send({ error: 'No autorizado', message: 'Refresh token inválido o expirado' })
     }

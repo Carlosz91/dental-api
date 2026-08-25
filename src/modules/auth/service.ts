@@ -70,7 +70,7 @@ export class AuthService {
     })
   }
 
-  private async generateTokens(user: { id: string; email: string; role: UserRole; specialistId?: string }) {
+  private async generateTokens(user: { id: string; email: string; role: UserRole; fullName?: string | null; specialistId?: string }) {
     const payload = { id: user.id, email: user.email, role: user.role, specialistId: user.specialistId }
 
     const accessToken = this.fastify.jwt.sign(payload)
@@ -85,6 +85,6 @@ export class AuthService {
       },
     })
 
-    return { accessToken, refreshToken, user: payload }
+    return { accessToken, refreshToken, user: { id: user.id, email: user.email, role: user.role, fullName: user.fullName ?? null } }
   }
 }
