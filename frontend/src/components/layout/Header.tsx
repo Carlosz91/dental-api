@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ClipboardList, LogIn, LogOut, Menu, Stethoscope, UserPlus, X } from 'lucide-react';
+import { ClipboardList, LogOut, Menu, Stethoscope, X } from 'lucide-react';
 import { CornerLogo } from '../common/CornerLogo';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -37,14 +37,16 @@ export const Header = () => {
         <div className="absolute right-4 hidden items-center gap-2 md:flex sm:right-6">
           {user ? (
             <div className="flex items-center gap-2">
-              {['especialista', 'admin'].includes(user.role ?? '') && (
+              {['especialista', 'staff', 'admin'].includes(user.role ?? '') && (
                 <Link to="/dashboard" className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-dental-700 hover:bg-dental-50">
                   <Stethoscope className="h-4 w-4" /> Panel
                 </Link>
               )}
-              <Link to="/myappointments" className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-dental-700 hover:bg-dental-50">
-                <ClipboardList className="h-4 w-4" /> Mis citas
-              </Link>
+              {user.role === 'paciente' && (
+                <Link to="/myappointments" className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-dental-700 hover:bg-dental-50">
+                  <ClipboardList className="h-4 w-4" /> Mis citas
+                </Link>
+              )}
               <span className="px-1 text-sm font-medium text-slate-600">
                 Hola, {firstName}
               </span>
@@ -59,11 +61,11 @@ export const Header = () => {
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <Link to="/login" className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-dental-700 hover:bg-dental-50">
-                <LogIn className="h-4 w-4" /> Iniciar sesión
+              <Link to="/login" className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-50 hover:text-dental-700">
+                <ClipboardList className="h-4 w-4" /> Mis citas
               </Link>
-              <Link to="/register" className="inline-flex items-center gap-2 rounded-xl bg-dental-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-dental-600">
-                <UserPlus className="h-4 w-4" /> Crear cuenta
+              <Link to="/staff/login" className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-50 hover:text-dental-700">
+                <Stethoscope className="h-4 w-4" /> Panel
               </Link>
             </div>
           )}
@@ -94,9 +96,16 @@ export const Header = () => {
               <span className="px-1 text-sm font-medium text-slate-600">
                 Hola, {firstName}
               </span>
-              <Link to="/myappointments" onClick={closeMenu} className="flex items-center gap-2 rounded-xl bg-dental-50 px-4 py-3 font-semibold text-dental-700">
-                <ClipboardList className="h-4 w-4" /> Mis citas
-              </Link>
+              {['especialista', 'staff', 'admin'].includes(user.role ?? '') && (
+                <Link to="/dashboard" onClick={closeMenu} className="flex items-center gap-2 rounded-xl bg-dental-50 px-4 py-3 font-semibold text-dental-700">
+                  <Stethoscope className="h-4 w-4" /> Panel
+                </Link>
+              )}
+              {user.role === 'paciente' && (
+                <Link to="/myappointments" onClick={closeMenu} className="flex items-center gap-2 rounded-xl bg-dental-50 px-4 py-3 font-semibold text-dental-700">
+                  <ClipboardList className="h-4 w-4" /> Mis citas
+                </Link>
+              )}
               <button
                 type="button"
                 onClick={() => void handleLogout()}
@@ -106,12 +115,12 @@ export const Header = () => {
               </button>
             </div>
           ) : (
-            <div className="grid gap-2 border-t border-dental-100 pt-5">
-              <Link to="/login" onClick={closeMenu} className="flex items-center justify-center gap-2 rounded-xl border border-dental-200 px-4 py-3 font-semibold text-dental-700">
-                <LogIn className="h-4 w-4" /> Iniciar sesión
+            <div className="grid gap-2">
+              <Link to="/login" onClick={closeMenu} className="flex items-center gap-2 rounded-xl px-4 py-3 font-semibold text-slate-600 hover:bg-slate-50 hover:text-dental-700">
+                <ClipboardList className="h-4 w-4" /> Mis citas
               </Link>
-              <Link to="/register" onClick={closeMenu} className="flex items-center justify-center gap-2 rounded-xl bg-dental-500 px-4 py-3 font-semibold text-white">
-                <UserPlus className="h-4 w-4" /> Crear cuenta
+              <Link to="/staff/login" onClick={closeMenu} className="flex items-center gap-2 rounded-xl px-4 py-3 font-semibold text-slate-600 hover:bg-slate-50 hover:text-dental-700">
+                <Stethoscope className="h-4 w-4" /> Panel
               </Link>
             </div>
           )}

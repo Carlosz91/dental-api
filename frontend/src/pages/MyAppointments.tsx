@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { CheckCircle2, Clock3, HeartPulse, CalendarClock, Ban, CalendarDays } from 'lucide-react';
 import { useAppointments } from '../hooks/useAppointments';
 import type { Appointment } from '../hooks/useAppointments';
@@ -6,6 +7,7 @@ import { useAvailability } from '../hooks/useSpecialists';
 import type { AvailabilitySlot } from '../hooks/useSpecialists';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
+import { useAuth } from '../hooks/useAuth';
 
 /** Inline editor to move an appointment to another slot, using real availability */
 function RescheduleEditor({ appointment, onDone }: { appointment: Appointment; onDone: () => void }) {
@@ -92,6 +94,7 @@ function RescheduleEditor({ appointment, onDone }: { appointment: Appointment; o
 }
 
 export const MyAppointments = () => {
+  const { user } = useAuth();
   const [filterDate, setFilterDate] = useState('');
   const [actionError, setActionError] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -102,7 +105,10 @@ export const MyAppointments = () => {
     cancelAppointment,
     isCancelling,
     isRescheduling,
-  } = useAppointments();
+  } = useAppointments(user?.id);
+
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== 'paciente') return <Navigate to="/dashboard" replace />;
 
   const visibleAppointments = appointments.filter(
     (appointment: Appointment) => !filterDate || appointment.date.includes(filterDate)

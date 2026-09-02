@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { axiosInstance, setAccessToken } from '../lib/api';
 
-export type UserRole = 'paciente' | 'admin' | null;
+export type UserRole = 'paciente' | 'especialista' | 'admin' | 'staff' | null;
 
 interface AuthUser {
   id: string;
@@ -31,13 +31,20 @@ interface ApiUser {
 }
 
 function normalizeUser(apiUser: ApiUser): AuthUser {
+  const roleMap: Record<string, Exclude<UserRole, null>> = {
+    patient: 'paciente',
+    paciente: 'paciente',
+    specialist: 'especialista',
+    especialista: 'especialista',
+    admin: 'admin',
+    staff: 'staff',
+  };
+
   return {
     id: String(apiUser?.id ?? ''),
     name: String(apiUser?.fullName || apiUser?.name || apiUser?.email || 'Usuario'),
     email: String(apiUser?.email ?? ''),
-    role: (typeof apiUser?.role === 'string'
-      ? (apiUser.role.toLowerCase() as UserRole)
-      : null) as UserRole,
+    role: typeof apiUser?.role === 'string' ? roleMap[apiUser.role.toLowerCase()] ?? null : null,
     specialistId: apiUser?.specialistId ?? null,
   };
 }

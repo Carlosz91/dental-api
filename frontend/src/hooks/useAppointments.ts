@@ -88,7 +88,7 @@ const exampleAppointments: Appointment[] = [
 
 export const useAppointments = (_userId?: string) => {
   const queryClient = useQueryClient();
-  const key = ['appointments'];
+  const key = ['appointments', _userId ?? 'anonymous'];
 
   const { data: appointments = [], isLoading } = useQuery({
     queryKey: key,
@@ -96,15 +96,12 @@ export const useAppointments = (_userId?: string) => {
       if (isDemoMode) {
         return exampleAppointments;
       }
-      try {
-        // The API scopes the list by auth token (patients see their own)
-        const response = await axiosInstance.get('/appointments');
-        const raw: ApiAppointment[] = response.data?.appointments ?? [];
-        return raw.map(mapApiAppointment);
-      } catch {
-        return exampleAppointments;
-      }
+      // The API scopes the list by auth token (patients see their own).
+      const response = await axiosInstance.get('/appointments');
+      const raw: ApiAppointment[] = response.data?.appointments ?? [];
+      return raw.map(mapApiAppointment);
     },
+    enabled: !!_userId,
     retry: false,
     staleTime: 30000,
   });

@@ -6,8 +6,8 @@ import { mapApiAppointment, type ApiAppointment, type Appointment } from '../hoo
 import { useAuth } from '../hooks/useAuth';
 import { Button } from '../components/common/Button';
 
-/** Only dentists (and admins) can see this panel */
-const ALLOWED_ROLES = ['especialista', 'admin'];
+/** Specialists see their agenda; staff and admins see the central agenda. */
+const ALLOWED_ROLES = ['especialista', 'staff', 'admin'];
 
 function DashboardStat({ label, value, icon: Icon }: { label: string; value: number; icon: typeof Clock3 }) {
   return (
@@ -26,20 +26,15 @@ function DashboardStat({ label, value, icon: Icon }: { label: string; value: num
 export const Dashboard = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-
-  // Route guard: dentists and admins only
-  if (!user || !ALLOWED_ROLES.includes(user.role ?? '')) {
-    return <Navigate to="/" replace />;
-  }
-
-  const specialistId = user.specialistId;
+  const specialistId = user?.specialistId;
+  const isCentralUser = user?.role === 'admin' || user?.role === 'staff';
 
   const appointmentsQuery = useQuery({
     queryKey: ['specialist-appointments', specialistId],
-    enabled: !!specialistId,
+    enabled: isCentralUser || !!specialistId,
     queryFn: async () => {
       const response = await axiosInstance.get('/appointments', {
-        params: { specialistId },
+        params: isCentralUser ? undefined : { specialistId },
       });
       const raw: ApiAppointment[] = response.data?.appointments ?? [];
       return raw.map(mapApiAppointment);
@@ -60,7 +55,12 @@ export const Dashboard = () => {
     },
   });
 
-  if (!specialistId) {
+  // Route guard: professional roles only
+  if (!user || !ALLOWED_ROLES.includes(user.role ?? '')) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (!specialistId && !isCentralUser) {
     return (
       <section className="min-h-screen px-4 py-16">
         <div className="mx-auto max-w-2xl rounded-2xl border border-amber-200 bg-amber-50 p-8 text-center">
@@ -98,7 +98,7 @@ export const Dashboard = () => {
         <div className="mb-8">
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-dental-600">Panel profesional</p>
           <h1 className="mt-2 text-3xl font-bold text-slate-900 sm:text-4xl">Hola, {user.name}</h1>
-          <p className="mt-2 text-slate-500">Tu agenda de pacientes en tiempo real.</p>
+          <p className="mt-2 text-slate-500">{isCentralUser ? 'Todas las citas de la clínica en tiempo real.' : 'Tu agenda de pacientes en tiempo real.'}</p>
         </div>
 
         {/* Stats */}
@@ -130,6 +130,7 @@ export const Dashboard = () => {
                     <p className="text-sm text-slate-500">
                       {appointment.patientName} · <span className="capitalize">{appointment.specialty?.toLowerCase() || 'consulta'}</span>
                     </p>
+                    {isCentralUser && <p className="mt-1 text-sm font-semibold text-dental-700">Especialista: {appointment.specialistName || 'Sin asignar'}</p>}
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">

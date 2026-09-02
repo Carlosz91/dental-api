@@ -27,7 +27,10 @@ export class AuthService {
   }
 
   async login(email: string, password: string) {
-    const user = await this.prisma.user.findUnique({ where: { email } })
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      include: { specialist: { select: { id: true } } },
+    })
     if (!user || !user.isActive) throw new Error('INVALID_CREDENTIALS')
 
     const valid = await verifyPassword(password, user.passwordHash)
@@ -46,7 +49,7 @@ export class AuthService {
 
     const stored = await this.prisma.refreshToken.findUnique({
       where: { tokenHash },
-      include: { user: true },
+      include: { user: { include: { specialist: { select: { id: true } } } } },
     })
 
     if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
@@ -70,8 +73,9 @@ export class AuthService {
     })
   }
 
-  private async generateTokens(user: { id: string; email: string; role: UserRole; fullName?: string | null; specialistId?: string }) {
-    const payload = { id: user.id, email: user.email, role: user.role, specialistId: user.specialistId }
+  private async generateTokens(user: { id: string; email: string; role: UserRole; fullName?: string | null; specialistId?: string | null; specialist?: { id: string } | null }) {
+    const specialistId = user.specialistId ?? user.specialist?.id ?? null
+    const payload = { id: user.id, email: user.email, role: user.role, specialistId }
 
     const accessToken = this.fastify.jwt.sign(payload)
     const refreshToken = crypto.randomBytes(64).toString('hex')
@@ -85,6 +89,6 @@ export class AuthService {
       },
     })
 
-    return { accessToken, refreshToken, user: { id: user.id, email: user.email, role: user.role, fullName: user.fullName ?? null } }
+    return { accessToken, refreshToken, user: { id: user.id, email: user.email, role: user.role, fullName: user.fullName ?? null, specialistId } }
   }
 }

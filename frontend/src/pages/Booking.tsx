@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { CalendarDays, Check, ChevronLeft, Clock3, HeartPulse, Scissors, Sparkles, Stethoscope, CheckCircle2 } from 'lucide-react';
 import { useAppointments } from '../hooks/useAppointments';
 import { useAvailability, useSpecialists } from '../hooks/useSpecialists';
@@ -47,6 +47,8 @@ export const Booking = () => {
   const selectedSpecialist = specialists.find((specialist: Specialist) => specialist.id === specialistId);
   const slots = availability?.slots ?? [];
 
+  if (!user) return <Navigate to="/login" replace />;
+
   const selectTreatment = (value: Treatment) => {
     setTreatment(value);
     setSpecialistId('');
@@ -84,6 +86,7 @@ export const Booking = () => {
         endsAt: selectedSlot.endsAt,
         patientName: patientName.trim(),
         patientPhone: patientPhone.trim(),
+        patientEmail: user.email,
       });
       setSuccess(true);
       // Dejamos ver la confirmación antes de ir al inicio
