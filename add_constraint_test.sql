@@ -1,2 +1,0 @@
-CREATE EXTENSION IF NOT EXISTS btree_gist;
-ALTER TABLE "Appointment" ADD CONSTRAINT "no_double_booking" EXCLUDE USING GIST ("specialistId" WITH =, tsrange("startsAt", "endsAt") WITH &&) WHERE ("status" NOT IN ('CANCELADO', 'NO_ASISTIO'));
