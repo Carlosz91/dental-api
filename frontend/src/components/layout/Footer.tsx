@@ -1,3 +1,13 @@
+import { Link } from 'react-router-dom';
+
+const linkClass =
+  'inline-flex min-h-[44px] items-center rounded-md text-slate-600 transition-colors hover:text-dental-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dental-800';
+
+const socialLinks = [
+  { label: 'Instagram', short: 'IG', href: 'https://instagram.com' },
+  { label: 'Facebook', short: 'FB', href: 'https://facebook.com' },
+  { label: 'X (Twitter)', short: 'X', href: 'https://twitter.com' },
+];
 
 /**
  * Footer with contact information, quick links, and social icons
@@ -5,86 +15,46 @@
  */
 export const Footer = () => {
   return (
-    <footer className="border-t border-dental-200 py-12 mt-auto">
-      <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 gap-6 md:grid-cols-3">
-        {/* Left column - DentalCare */}
+    <footer className="mt-auto border-t border-dental-200 py-10">
+      <div className="mx-auto grid max-w-7xl grid-cols-1 gap-8 px-4 sm:px-6 md:grid-cols-3">
         <div>
-          <h4 className="font-semibold text-dental-700 mb-4">DentalCare</h4>
-          <p className="text-dental-400 text-sm">
+          <p className="mb-3 font-semibold text-dental-900">DentalCare</p>
+          <p className="max-w-xs text-sm text-slate-600">
             Tu clínica dental de confianza para toda la familia. Agenda tu cita hoy mismo.
           </p>
         </div>
 
-        {/* Center column - Quick links */}
-        <div>
-          <h5 className="font-medium text-dental-700 mb-4">Enlaces rápidos</h5>
-          <ul className="space-y-2 text-dental-400 text-sm">
-            <li>
-              <a href="/booking" className="hover:text-dental-500 transition-colors">
-                Agendar cita
-              </a>
-            </li>
-            <li>
-              <a href="/myappointments" className="hover:text-dental-500 transition-colors">
-                Mis citas
-              </a>
-            </li>
+        <nav aria-label="Enlaces rápidos">
+          <p className="mb-2 font-semibold text-dental-900">Enlaces rápidos</p>
+          <ul className="text-sm">
+            <li><Link to="/booking" className={linkClass}>Agendar cita</Link></li>
+            <li><Link to="/specialists" className={linkClass}>Especialistas</Link></li>
+            <li><Link to="/myappointments" className={linkClass}>Mis citas</Link></li>
           </ul>
-        </div>
+        </nav>
 
-        {/* Right column - Social links */}
         <div>
-          <h5 className="font-medium text-dental-700 mb-4">Síguenos</h5>
-          <div className="flex gap-3">
-            <a
-              href="https://instagram.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-purple-500 transition-colors"
-            >
-              <span aria-label="Instagram">IG</span>
-            </a>
-            <a
-              href="https://facebook.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-red-500 transition-colors"
-            >
-              <span aria-label="Facebook">FB</span>
-            </a>
-            <a
-              href="https://twitter.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-blue-500 transition-colors"
-            >
-              <span aria-label="Twitter">X</span>
-            </a>
-          </div>
+          <p className="mb-2 font-semibold text-dental-900">Síguenos</p>
+          <ul className="flex gap-2">
+            {socialLinks.map((social) => (
+              <li key={social.label}>
+                <a
+                  href={social.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`${social.label} (se abre en una pestaña nueva)`}
+                  className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-300 text-sm font-semibold text-slate-700 transition-colors hover:border-dental-800 hover:text-dental-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dental-800"
+                >
+                  {social.short}
+                </a>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
 
-      {/* Bottom section - Copyright */}
-      <div className="mt-8 pt-8 border-t border-dental-200 flex flex-col md:flex-row justify-between items-center text-dental-400 text-sm">
-        <p>2026 DentalCare. Todos los derechos reservados.</p>
-        <div className="flex gap-4">
-          <a
-            href="#"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-dental-500 transition-colors"
-          >
-            Política de privacidad
-          </a>
-          <a
-            href="#"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-dental-500 transition-colors"
-          >
-            Términos de servicio
-          </a>
-        </div>
+      <div className="mx-auto mt-8 max-w-7xl border-t border-dental-200 px-4 pt-6 text-sm text-slate-600 sm:px-6">
+        <p>© 2026 DentalCare. Todos los derechos reservados.</p>
       </div>
     </footer>
   );

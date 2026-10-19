@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { app, prisma } from './setup.js'
+import { MONDAY } from './utils/dates.js'
 import { createTestSpecialist, createAvailabilityRule, createTestUser } from './utils/factories.js'
 import { Specialty, UserRole } from '@prisma/client'
 
@@ -26,7 +27,7 @@ describe('Concurrency - Double Booking Prevention', () => {
   })
 
   it('should allow only ONE appointment for the same slot under concurrent load', async () => {
-    const slot = { startsAt: '2026-08-24T08:00:00-03:00', endsAt: '2026-08-24T08:30:00-03:00' }
+    const slot = { startsAt: `${MONDAY}T08:00:00-03:00`, endsAt: `${MONDAY}T08:30:00-03:00` }
 
     // Deshabilitar rate limit para este test
     const originalRateLimit = process.env.RATE_LIMIT_MAX
@@ -74,7 +75,7 @@ describe('Concurrency - Double Booking Prevention', () => {
 
     // Verificar en DB
     const appointments = await prisma.appointment.findMany({
-      where: { specialistId, startsAt: new Date('2026-08-24T08:00:00-03:00') },
+      where: { specialistId, startsAt: new Date(`${MONDAY}T08:00:00-03:00`) },
     })
     expect(appointments).toHaveLength(1)
   })

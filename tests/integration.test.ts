@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { app, prisma, registerAndLogin, loginAs } from './setup.js'
+import { MONDAY } from './utils/dates.js'
 import { createTestSpecialist, createAvailabilityRule, createTestUser } from './utils/factories.js'
 import { Specialty, UserRole, AppointmentStatus } from '@prisma/client'
 
@@ -35,8 +36,8 @@ describe('Integration - Full Booking Flow', () => {
         specialistId,
         patientName: 'Flujo Paciente',
         patientPhone: '11-5555-6666',
-        startsAt: '2026-08-24T08:00:00-03:00', // Lunes
-        endsAt: '2026-08-24T09:00:00-03:00',   // Cirugía 60 min
+        startsAt: `${MONDAY}T08:00:00-03:00`, // Lunes
+        endsAt: `${MONDAY}T09:00:00-03:00`,   // Cirugía 60 min
         specialty: 'CIRUGIA',
       },
     })
@@ -100,8 +101,8 @@ describe('Integration - Full Booking Flow', () => {
         specialistId,
         patientName: 'Flujo Paciente',
         patientPhone: '11-5555-6666',
-        startsAt: '2026-08-24T08:00:00-03:00',
-        endsAt: '2026-08-24T09:00:00-03:00',
+        startsAt: `${MONDAY}T08:00:00-03:00`,
+        endsAt: `${MONDAY}T09:00:00-03:00`,
         specialty: 'CIRUGIA',
       },
     })
@@ -130,7 +131,7 @@ describe('Integration - Full Booking Flow', () => {
     // El slot debe volver a estar disponible
     const slotsRes = await app.inject({
       method: 'GET',
-      url: `/api/v1/availability/${specialistId}/slots?date=2026-08-24`,
+      url: `/api/v1/availability/${specialistId}/slots?date=${MONDAY}`,
     })
     const slotsBody = typeof slotsRes.body === 'string' ? JSON.parse(slotsRes.body) : slotsRes.body
     const slots = slotsBody.slots

@@ -109,3 +109,59 @@ export async function calculateAvailableSlots(
 
   return slots
 }
+
+export type BookingWindowError =
+  | 'INVALID_TIME_RANGE'
+  | 'SLOT_IN_PAST'
+  | 'OUTSIDE_AVAILABILITY'
+  | 'SLOT_BLOCKED'
+
+const toMinutes = (hhmm: string) => {
+  const [h, m] = hhmm.split(':').map(Number)
+  return h * 60 + m
+}
+
+/**
+ * Server-side booking validation shared by create and reschedule.
+ * Throws Error(code) where code is a BookingWindowError:
+ *  - INVALID_TIME_RANGE: endsAt must be after startsAt
+ *  - SLOT_IN_PAST: startsAt must be in the future
+ *  - OUTSIDE_AVAILABILITY: the window must fit inside one AvailabilityRule
+ *    (clinic-local weekday, effective dates and start/end time of day)
+ *  - SLOT_BLOCKED: the window must not overlap any BlockedSlot
+ * Overlap with other appointments is NOT checked here (DB exclusion constraint + service check).
+ */
+export async function assertBookableWindow(
+  prisma: PrismaClient,
+  specialistId: string,
+  startsAt: Date,
+  endsAt: Date,
+  now: Date = new Date()
+): Promise<void> {
+  if (!(endsAt.getTime() > startsAt.getTime())) throw new Error('INVALID_TIME_RANGE')
+  if (startsAt.getTime() <= now.getTime()) throw new Error('SLOT_IN_PAST')
+
+  const localStart = dayjs(startsAt).tz(BUSINESS_TZ)
+  const localEnd = dayjs(endsAt).tz(BUSINESS_TZ)
+  if (!localStart.isSame(localEnd, 'day')) throw new Error('OUTSIDE_AVAILABILITY')
+
+  const rules = await prisma.availabilityRule.findMany({
+    where: {
+      specialistId,
+      weekday: localStart.day(),
+      effectiveFrom: { lte: startsAt },
+      OR: [{ effectiveTo: null }, { effectiveTo: { gte: startsAt } }],
+    },
+  })
+
+  const startMin = localStart.hour() * 60 + localStart.minute()
+  const endMin = localEnd.hour() * 60 + localEnd.minute()
+  const inside = rules.some((r) => startMin >= toMinutes(r.startTime) && endMin <= toMinutes(r.endTime))
+  if (!inside) throw new Error('OUTSIDE_AVAILABILITY')
+
+  const block = await prisma.blockedSlot.findFirst({
+    where: { specialistId, startsAt: { lt: endsAt }, endsAt: { gt: startsAt } },
+    select: { id: true },
+  })
+  if (block) throw new Error('SLOT_BLOCKED')
+}

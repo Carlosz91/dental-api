@@ -16,13 +16,6 @@ export const loginSchema = z.object({
   }),
 })
 
-export const refreshSchema = z.object({
-  // Body optional: browsers rely on the httpOnly cookie alone
-  body: z.object({
-    refreshToken: z.string().optional(),
-  }).optional(),
-})
-
 export const forgotPasswordSchema = z.object({
   body: z.object({
     email: z.string().email(),

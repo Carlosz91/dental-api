@@ -28,4 +28,4 @@ npm run lint       # oxlint
 
 - El access token vive **solo en memoria** (nunca localStorage).
 - Al recargar la página la sesión se restaura con la cookie httpOnly (`/auth/refresh`).
-- Auto-cierre tras **2 minutos** de inactividad.
+- Auto-cierre tras **15 minutos** de inactividad, con aviso y cuenta regresiva durante el último minuto (constantes `INACTIVITY_TIMEOUT_MS` / `INACTIVITY_WARNING_MS` en `src/hooks/useInactivityTimeout.ts`).

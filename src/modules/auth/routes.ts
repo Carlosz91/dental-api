@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyRequest } from 'fastify'
 import { AuthService } from './service.js'
-import { registerSchema, loginSchema, refreshSchema } from './schemas.js'
+import { registerSchema, loginSchema } from './schemas.js'
 import { parseRequest } from '../../utils/parse-request.js'
 
 export async function authRoutes(fastify: FastifyInstance) {
@@ -53,8 +53,8 @@ export async function authRoutes(fastify: FastifyInstance) {
   })
 
   fastify.post('/refresh', {}, async (request, reply) => {
-    const input = parseRequest(refreshSchema, request)
-    const refreshToken = input.body?.refreshToken || request.cookies.refreshToken
+    // The refresh token is accepted ONLY from the httpOnly cookie (never body, never echoed in JSON)
+    const refreshToken = request.cookies.refreshToken
     if (!refreshToken) return reply.code(401).send({ error: 'Refresh token requerido' })
 
     try {
@@ -66,7 +66,7 @@ export async function authRoutes(fastify: FastifyInstance) {
         maxAge: 7 * 24 * 60 * 60,
         path: '/',
       })
-      return { accessToken: result.accessToken, refreshToken: result.refreshToken, user: result.user }
+      return { accessToken: result.accessToken, user: result.user }
     } catch {
       reply.clearCookie('refreshToken', { path: '/' })
       return reply.code(401).send({ error: 'Sesión expirada, inicie sesión nuevamente' })

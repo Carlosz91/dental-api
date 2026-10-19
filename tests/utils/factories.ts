@@ -1,6 +1,7 @@
 import { PrismaClient, UserRole, Specialty, AppointmentStatus } from '@prisma/client'
 import { hashPassword } from '../../src/utils/password.js'
 import dayjs from 'dayjs'
+import { MONDAY } from './dates.js'
 
 export async function createTestUser(
   prisma: PrismaClient,
@@ -101,8 +102,8 @@ export async function createAppointment(
     data: {
       specialistId: specialist!.id,
       patientId: patient!.id,
-      startsAt: overrides.startsAt || new Date('2026-08-24T08:00:00-03:00'),
-      endsAt: overrides.endsAt || new Date('2026-08-24T08:30:00-03:00'),
+      startsAt: overrides.startsAt || new Date(`${MONDAY}T08:00:00-03:00`),
+      endsAt: overrides.endsAt || new Date(`${MONDAY}T08:30:00-03:00`),
       status: overrides.status || AppointmentStatus.PENDIENTE,
       specialty: overrides.specialty || specialist!.specialty,
       source: 'WEB',

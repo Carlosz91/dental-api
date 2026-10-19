@@ -1,20 +1,17 @@
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '../components/common/Button';
 
 export const NotFound = () => {
+  const navigate = useNavigate();
   return (
-    <section className="min-h-screen flex items-center justify-center bg-dental-50">
-      <div className="bg-white rounded-3xl p-8 max-w-md w-full animate-slide-in-right">
-        <h2 className="text-4xl font-bold text-dental-900 mb-4">404 - Página no encontrada</h2>
-        <p className="text-dental-500 mb-6">
-          La página que estás buscando no existe o ha sido movida.
-        </p>
-        <div className="flex gap-3">
-          <Link to="/" className="btn-dental-primary flex-1">
-            Ir a Inicio
-          </Link>
-          <Link to="/specialists" className="btn-dental-secondary flex-1">
-            Ver Especialistas
-          </Link>
+    <section className="flex min-h-[60vh] items-center justify-center px-4 py-16">
+      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-rose-700">Error 404</p>
+        <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-900">Página no encontrada</h1>
+        <p className="mt-3 text-slate-600">La página que buscas no existe o fue movida.</p>
+        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          <Button className="w-full" onClick={() => navigate('/')}>Ir al inicio</Button>
+          <Button variant="secondary" className="w-full" onClick={() => navigate('/specialists')}>Ver especialistas</Button>
         </div>
       </div>
     </section>

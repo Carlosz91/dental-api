@@ -53,10 +53,13 @@ let inflightRefresh: Promise<string | null> | null = null;
 async function refreshAccessToken(): Promise<string | null> {
   if (!inflightRefresh) {
     inflightRefresh = axiosInstance
+      // The API reads the httpOnly cookie only; the JSON reply carries just { accessToken }.
       .post('/auth/refresh', {}) // {} avoids FST_ERR_CTP_EMPTY_JSON_BODY
       .then((response) => {
-        setAccessToken(response.data.accessToken);
-        return response.data.accessToken as string;
+        const token = response.data?.accessToken as string | undefined;
+        if (!token) throw new Error('Refresh response without accessToken');
+        setAccessToken(token);
+        return token;
       })
       .catch((refreshError) => {
         // Session truly expired
@@ -94,6 +97,16 @@ axiosInstance.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+/**
+ * Best human-readable message from an API error. The API replies with
+ * `{ error }` (and `{ message }` on authorization refusals, in Spanish).
+ */
+export function getApiErrorMessage(err: unknown, fallback: string): string {
+  const response = (err as { response?: { status?: number; data?: { error?: string; message?: string } } })?.response;
+  if (response?.status === 403 && response.data?.message) return response.data.message;
+  return response?.data?.error || fallback;
+}
 
 export { axiosInstance };
 export default axiosInstance;

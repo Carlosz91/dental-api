@@ -10,7 +10,9 @@ const rateLimitPlugin: FastifyPluginAsync = async (fastify) => {
     max: Number(process.env.RATE_LIMIT_MAX) || 300,
     timeWindow: Number(process.env.RATE_LIMIT_WINDOW_MS) || 60000,
     keyGenerator: (request) => request.ip,
-    allowList: ['127.0.0.1', '::1'],
+    // SECURITY: never allow-list loopback outside tests; behind a local reverse proxy
+    // every client would appear as 127.0.0.1 and bypass the limiter.
+    allowList: process.env.NODE_ENV === 'test' ? ['127.0.0.1', '::1'] : [],
     errorResponseBuilder: () => ({
       code: 429,
       error: 'Too Many Requests',

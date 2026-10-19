@@ -18,6 +18,8 @@ interface AuthState {
   login: (email: string, password: string) => Promise<void>;
   register: (data: { name: string; email: string; phone?: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
+  /** Drops the local session without calling the API (refresh already failed) */
+  expireSession: () => void;
 }
 
 /** Backend user shape (login/refresh/me responses) */
@@ -117,6 +119,11 @@ export const useAuth = create<AuthState>()((set) => ({
         'No se pudo crear la cuenta';
       throw new Error(message);
     }
+  },
+
+  expireSession: () => {
+    setAccessToken(null);
+    set({ user: null });
   },
 
   logout: async () => {

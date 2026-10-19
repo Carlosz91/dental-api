@@ -1,4 +1,4 @@
-﻿/* Dental Theme CSS - Optimized for Tailwind CSS */
+/* Dental Theme CSS - Optimized for Tailwind CSS */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -78,6 +78,34 @@
 
   ::-webkit-scrollbar-corner {
     @apply bg-dental-100;
+  }
+
+  /* Visible keyboard focus everywhere (components can refine it) */
+  :focus-visible {
+    outline: 2px solid #2a5eb9;
+    outline-offset: 2px;
+  }
+
+  /* Never allow horizontal page scroll on small screens */
+  html,
+  body {
+    overflow-x: hidden;
+  }
+
+  /* Respect users who ask the OS for less motion */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 
   /* Selection */

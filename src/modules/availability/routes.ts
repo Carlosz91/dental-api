@@ -53,8 +53,14 @@ export async function availabilityRoutes(fastify: FastifyInstance) {
       preHandler: [fastify.requireRole('ADMIN', 'STAFF')],
     }, async (request, reply) => {
       const input = parseRequest(updateAvailabilitySchema, request)
+      // Scope by specialistId so a rule can only be changed through its own specialist
+      const existing = await fastify.prisma.availabilityRule.findFirst({
+        where: { id: input.params.id, specialistId: input.params.specialistId },
+        select: { id: true },
+      })
+      if (!existing) return reply.code(404).send({ error: 'Regla no encontrada' })
       const rule = await fastify.prisma.availabilityRule.update({
-        where: { id: input.params.id },
+        where: { id: existing.id },
         data: input.body,
       })
       return { rule }
@@ -68,7 +74,10 @@ export async function availabilityRoutes(fastify: FastifyInstance) {
         z.object({ params: z.object({ specialistId: z.string().uuid(), id: z.string().uuid() }) }),
         request
       )
-      await fastify.prisma.availabilityRule.delete({ where: { id: params.id } })
+      const { count } = await fastify.prisma.availabilityRule.deleteMany({
+        where: { id: params.id, specialistId: params.specialistId },
+      })
+      if (count === 0) return reply.code(404).send({ error: 'Regla no encontrada' })
       return { message: 'Regla eliminada' }
     })
 
@@ -102,7 +111,19 @@ export async function availabilityRoutes(fastify: FastifyInstance) {
         z.object({ params: z.object({ specialistId: z.string().uuid(), id: z.string().uuid() }) }),
         request
       )
-      await fastify.prisma.blockedSlot.delete({ where: { id: params.id } })
+      // SPECIALIST can only manage their own agenda (same check as POST)
+      if (request.user!.role === 'SPECIALIST') {
+        const specialist = await fastify.prisma.specialist.findUnique({
+          where: { userId: request.user!.id },
+        })
+        if (!specialist || specialist.id !== params.specialistId) {
+          return reply.code(403).send({ error: 'Prohibido', message: 'Solo puedes gestionar tu propia agenda' })
+        }
+      }
+      const { count } = await fastify.prisma.blockedSlot.deleteMany({
+        where: { id: params.id, specialistId: params.specialistId },
+      })
+      if (count === 0) return reply.code(404).send({ error: 'Bloqueo no encontrado' })
       return { message: 'Bloqueo eliminado' }
     })
   })

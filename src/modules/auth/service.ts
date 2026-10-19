@@ -52,17 +52,37 @@ export class AuthService {
       include: { user: { include: { specialist: { select: { id: true } } } } },
     })
 
-    if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
+    if (!stored) throw new Error('INVALID_REFRESH_TOKEN')
+
+    // Reuse of an already-revoked token means it may have been stolen:
+    // revoke every live token of that user (forces a fresh login everywhere).
+    if (stored.revokedAt) {
+      await this.revokeAllForUser(stored.userId)
       throw new Error('INVALID_REFRESH_TOKEN')
     }
 
-    // Rotar refresh token
-    await this.prisma.refreshToken.update({
-      where: { id: stored.id },
+    if (stored.expiresAt < new Date() || !stored.user.isActive) {
+      throw new Error('INVALID_REFRESH_TOKEN')
+    }
+
+    // Atomic rotation: only one concurrent request can flip revokedAt from null
+    const rotated = await this.prisma.refreshToken.updateMany({
+      where: { id: stored.id, revokedAt: null },
       data: { revokedAt: new Date() },
     })
+    if (rotated.count !== 1) {
+      await this.revokeAllForUser(stored.userId)
+      throw new Error('INVALID_REFRESH_TOKEN')
+    }
 
     return this.generateTokens(stored.user)
+  }
+
+  private async revokeAllForUser(userId: string) {
+    await this.prisma.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    })
   }
 
   async logout(refreshToken: string) {

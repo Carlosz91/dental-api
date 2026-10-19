@@ -113,14 +113,66 @@ describe('Auth Module', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/auth/refresh',
-        payload: { refreshToken },
+        cookies: { refreshToken: refreshToken! },
       })
 
       expect(res.statusCode).toBe(200)
       const body = JSON.parse(res.body)
       expect(body.accessToken).toBeDefined()
-      expect(body.refreshToken).toBeDefined()
-      expect(body.refreshToken).not.toBe(refreshToken)
+      // The new token travels only in the httpOnly cookie, never in JSON
+      expect(body.refreshToken).toBeUndefined()
+      const rotated = String(res.headers['set-cookie']).match(/refreshToken=([^;]+)/)?.[1]
+      expect(rotated).toBeDefined()
+      expect(rotated).not.toBe(refreshToken)
+    })
+
+    it('should not accept the refresh token from the body', async () => {
+      const { refreshToken } = await registerAndLogin({
+        email: 'bodyrefresh@test.com',
+        password: 'Pass123!',
+        fullName: 'Body Refresh',
+      })
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/v1/auth/refresh',
+        payload: { refreshToken },
+      })
+      expect(res.statusCode).toBe(401)
+    })
+
+    it('should reject refresh for inactive users', async () => {
+      const { refreshToken, user } = await registerAndLogin({
+        email: 'inactive@test.com',
+        password: 'Pass123!',
+        fullName: 'Inactive User',
+      })
+      await prisma.user.update({ where: { id: user.id }, data: { isActive: false } })
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/v1/auth/refresh',
+        cookies: { refreshToken: refreshToken! },
+      })
+      expect(res.statusCode).toBe(401)
+    })
+
+    it('should revoke all user tokens when a revoked token is reused', async () => {
+      const { refreshToken, user } = await registerAndLogin({
+        email: 'theft@test.com',
+        password: 'Pass123!',
+        fullName: 'Theft User',
+      })
+      const first = await app.inject({ method: 'POST', url: '/api/v1/auth/refresh', cookies: { refreshToken: refreshToken! } })
+      const rotated = String(first.headers['set-cookie']).match(/refreshToken=([^;]+)/)![1]
+
+      // Attacker replays the old (revoked) token
+      const replay = await app.inject({ method: 'POST', url: '/api/v1/auth/refresh', cookies: { refreshToken: refreshToken! } })
+      expect(replay.statusCode).toBe(401)
+
+      // The legitimate rotated token is now dead too
+      const legit = await app.inject({ method: 'POST', url: '/api/v1/auth/refresh', cookies: { refreshToken: rotated } })
+      expect(legit.statusCode).toBe(401)
+      const live = await prisma.refreshToken.count({ where: { userId: user.id, revokedAt: null } })
+      expect(live).toBe(0)
     })
 
     it('should reject reused refresh token', async () => {
@@ -131,13 +183,13 @@ describe('Auth Module', () => {
       })
 
       // Primer uso
-      await app.inject({ method: 'POST', url: '/api/v1/auth/refresh', payload: { refreshToken } })
+      await app.inject({ method: 'POST', url: '/api/v1/auth/refresh', cookies: { refreshToken: refreshToken! } })
 
       // Segundo uso del mismo token (ya revocado)
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/auth/refresh',
-        payload: { refreshToken },
+        cookies: { refreshToken: refreshToken! },
       })
       expect(res.statusCode).toBe(401)
     })

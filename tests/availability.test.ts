@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { app, prisma, loginAs } from './setup.js'
+import { MONDAY, SUNDAY } from './utils/dates.js'
 import { createTestSpecialist, createAvailabilityRule, createTestUser } from './utils/factories.js'
 import { Specialty, UserRole } from '@prisma/client'
 import dayjs from 'dayjs'
@@ -28,7 +29,7 @@ describe('Availability Module', () => {
 
   describe('GET /api/v1/availability/:specialistId/slots', () => {
     it('should return available slots for a Monday', async () => {
-      const monday = dayjs('2026-08-24').format('YYYY-MM-DD') // Lunes
+      const monday = dayjs(MONDAY).format('YYYY-MM-DD') // Lunes
       const res = await app.inject({
         method: 'GET',
         url: `/api/v1/availability/${specialistId}/slots?date=${monday}`,
@@ -43,7 +44,7 @@ describe('Availability Module', () => {
     })
 
     it('should return empty for Sunday (no rules)', async () => {
-      const sunday = dayjs('2026-08-23').format('YYYY-MM-DD')
+      const sunday = dayjs(SUNDAY).format('YYYY-MM-DD')
       const res = await app.inject({
         method: 'GET',
         url: `/api/v1/availability/${specialistId}/slots?date=${sunday}`,
@@ -53,15 +54,15 @@ describe('Availability Module', () => {
     })
 
     it('should mark slots as unavailable when appointment exists', async () => {
-      const monday = dayjs('2026-08-24').format('YYYY-MM-DD')
+      const monday = dayjs(MONDAY).format('YYYY-MM-DD')
       // Crear cita en el primer slot
       const patient = await createTestUser(prisma, { email: 'pat@test.com' })
       await prisma.appointment.create({
         data: {
           specialistId,
           patientId: patient.id,
-          startsAt: new Date('2026-08-24T08:00:00-03:00'),
-          endsAt: new Date('2026-08-24T08:30:00-03:00'),
+          startsAt: new Date(`${MONDAY}T08:00:00-03:00`),
+          endsAt: new Date(`${MONDAY}T08:30:00-03:00`),
           specialty: Specialty.ORTODONCIA,
           status: 'CONFIRMADO',
         },
@@ -78,12 +79,12 @@ describe('Availability Module', () => {
     })
 
     it('should mark slots as blocked when blockedSlot exists', async () => {
-      const monday = dayjs('2026-08-24').format('YYYY-MM-DD')
+      const monday = dayjs(MONDAY).format('YYYY-MM-DD')
       await prisma.blockedSlot.create({
         data: {
           specialistId,
-          startsAt: new Date('2026-08-24T10:00:00-03:00'),
-          endsAt: new Date('2026-08-24T11:00:00-03:00'),
+          startsAt: new Date(`${MONDAY}T10:00:00-03:00`),
+          endsAt: new Date(`${MONDAY}T11:00:00-03:00`),
           reason: 'Mantenimiento',
         },
       })
@@ -130,6 +131,44 @@ describe('Availability Module', () => {
     })
   })
 
+  describe('scoping of rule/block mutations by specialistId', () => {
+    it('should not delete or update a rule through another specialist path', async () => {
+      const other = await createTestSpecialist(prisma, { specialty: Specialty.CIRUGIA })
+      const rule = await prisma.availabilityRule.findFirstOrThrow({ where: { specialistId } })
+
+      const del = await app.inject({
+        method: 'DELETE',
+        url: `/api/v1/availability/${other.id}/rules/${rule.id}`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      })
+      expect(del.statusCode).toBe(404)
+
+      const patch = await app.inject({
+        method: 'PATCH',
+        url: `/api/v1/availability/${other.id}/rules/${rule.id}`,
+        headers: { authorization: `Bearer ${adminToken}`, 'content-type': 'application/json' },
+        payload: { slotMinutes: 15 },
+      })
+      expect(patch.statusCode).toBe(404)
+      expect(await prisma.availabilityRule.count({ where: { id: rule.id } })).toBe(1)
+    })
+
+    it('should forbid a specialist from deleting another specialist block', async () => {
+      const other = await createTestSpecialist(prisma, { specialty: Specialty.CIRUGIA })
+      const block = await prisma.blockedSlot.create({
+        data: { specialistId, startsAt: new Date(`${MONDAY}T12:00:00-03:00`), endsAt: new Date(`${MONDAY}T13:00:00-03:00`), reason: 'X' },
+      })
+      const otherLogin = await loginAs(other.user.email, 'Test1234!')
+      const res = await app.inject({
+        method: 'DELETE',
+        url: `/api/v1/availability/${specialistId}/blocks/${block.id}`,
+        headers: { authorization: `Bearer ${otherLogin.accessToken}` },
+      })
+      expect(res.statusCode).toBe(403)
+      expect(await prisma.blockedSlot.count({ where: { id: block.id } })).toBe(1)
+    })
+  })
+
   describe('POST /api/v1/availability/:specialistId/blocks', () => {
     it('should allow specialist to block own schedule', async () => {
       // Get the specialist to find the correct email
@@ -140,8 +179,8 @@ describe('Availability Module', () => {
         url: `/api/v1/availability/${specialistId}/blocks`,
         headers: { authorization: `Bearer ${specLogin.accessToken}` },
         payload: {
-          startsAt: '2026-08-24T12:00:00-03:00',
-          endsAt: '2026-08-24T13:00:00-03:00',
+          startsAt: `${MONDAY}T12:00:00-03:00`,
+          endsAt: `${MONDAY}T13:00:00-03:00`,
           reason: 'Almuerzo',
         },
       })
@@ -155,7 +194,7 @@ describe('Availability Module', () => {
         method: 'POST',
         url: `/api/v1/availability/${specialistId}/blocks`,
         headers: { authorization: `Bearer ${otherLogin.accessToken}` },
-        payload: { startsAt: '2026-08-24T12:00:00-03:00', endsAt: '2026-08-24T13:00:00-03:00', reason: 'Hack' },
+        payload: { startsAt: `${MONDAY}T12:00:00-03:00`, endsAt: `${MONDAY}T13:00:00-03:00`, reason: 'Hack' },
       })
       expect(res.statusCode).toBe(403)
     })

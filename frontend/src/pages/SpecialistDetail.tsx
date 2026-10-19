@@ -1,165 +1,107 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { CalendarDays, ChevronLeft, Clock3 } from 'lucide-react';
 import { useSpecialistDetail, useAvailability } from '../hooks/useSpecialists';
+import { clinicToday } from '../hooks/useAppointments';
 import { Card } from '../components/common/Card';
 import { Badge } from '../components/common/Badge';
-import { Input } from '../components/common/Input';
 import { Button } from '../components/common/Button';
-import { useAppointments } from '../hooks/useAppointments';
+import { Loading } from '../components/common/Loading';
 
 export const SpecialistDetail = () => {
   const { id = '' } = useParams();
-  const { data: specialist, isLoading } = useSpecialistDetail(id);
   const navigate = useNavigate();
-  const specialistId = id;
+  const { data: specialist, isLoading } = useSpecialistDetail(id);
 
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [selectedTime, setSelectedTime] = useState('');
-  const { appointments = [] } = useAppointments();
-  const { data: availability, isLoading: availabilityLoading } = useAvailability(
-    specialistId,
-    selectedDate || ''
-  );
-  const availableSlots = availability?.slots || [];
-
-  const handleDateChange = (date: string) => {
-    setSelectedDate(date);
-    setSelectedTime('');
-  };
+  const [selectedDate, setSelectedDate] = useState('');
+  const [selectedSlot, setSelectedSlot] = useState('');
+  const { data: availability, isLoading: availabilityLoading } = useAvailability(id, selectedDate);
+  const slots = availability?.slots ?? [];
 
   if (isLoading || !specialist) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-dental-500">Cargando perfil del especialista...</div>
+      <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6" role="status">
+        <span className="sr-only">Cargando perfil del especialista...</span>
+        <Loading.Skeleton className="h-40 w-full" />
+        <Loading.Skeleton className="mt-6 h-64 w-full" />
       </div>
     );
   }
 
+  // The booking flow re-confirms the exact time; here we only carry specialist and date
+  const goToBooking = () => {
+    navigate(`/booking?specialist=${id}&date=${selectedDate}`);
+  };
+
   return (
-    <section className="py-20">
-      <div className="max-w-7xl mx-auto px-6">
-        {/* Specialist Profile Card */}
-        <Card className="mb-8">
-          <div className="p-6">
-            <div className="flex items-start gap-4">
-              {/* Avatar/Initials */}
-              <div className="w-20 h-20 rounded-2xl bg-dental-100 flex items-center justify-center flex-shrink-0">
-                <span className="text-4xl font-bold text-dental-500">
-                  {specialist.name.charAt(0)}
-                </span>
-              </div>
+    <section className="px-4 py-10 sm:px-6 lg:py-16">
+      <div className="mx-auto max-w-4xl">
+        <Link to="/specialists" className="mb-6 inline-flex min-h-[44px] items-center gap-1 text-sm font-semibold text-dental-900 underline-offset-2 hover:underline">
+          <ChevronLeft className="h-4 w-4" aria-hidden="true" /> Volver a especialistas
+        </Link>
 
-              <div className="flex-1 min-w-0">
-                <h2 className="text-2xl font-bold text-dental-900 mb-1">
-                  {specialist.name}
-                </h2>
-                <p className="text-dental-500">
-                  {specialist.specialty && (
-                      <Badge
-                        specialty={specialist.specialty as 'ortodoncia' | 'cirugia' | 'estetica'}
-                      />
-                    )}
-                </p>
-                <p className="text-dental-600 text-sm">
-                  {specialist.description || 'Especialista dental certificado'}
-                </p>
-              </div>
+        <Card className="mb-8 p-6">
+          <div className="flex items-start gap-4">
+            <div aria-hidden="true" className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-dental-100 text-3xl font-bold text-dental-900 sm:h-20 sm:w-20">
+              {specialist.name.charAt(0)}
             </div>
-
-            {/* Availability Section */}
-            {selectedDate && !availabilityLoading && availableSlots.length > 0 && (
-              <div className="mt-4 p-4 bg-dental-50 rounded border border-dental-200">
-                <h4 className="font-medium text-dental-700 mb-2">
-                  Disponibilidad para {selectedDate}
-                </h4>
-                <p className="text-dental-500 text-sm">
-                  {availableSlots.length} horarios disponibles
-                </p>
-              </div>
-            )}
+            <div className="min-w-0 flex-1">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{specialist.name}</h1>
+              {specialist.specialty && <div className="mt-2"><Badge specialty={specialist.specialty} /></div>}
+              <p className="mt-3 text-slate-600">{specialist.description || 'Especialista dental certificado'}</p>
+            </div>
           </div>
         </Card>
 
-        {/* Booking Form */}
-        <Card>
-          <h3 className="text-xl font-bold text-dental-900 mb-4">
-            Agendar Cita con Dr. {specialist.name}
-          </h3>
+        <Card className="p-6">
+          <h2 className="flex items-center gap-2 text-xl font-bold text-slate-900">
+            <CalendarDays className="h-5 w-5 text-dental-900" aria-hidden="true" /> Consulta la disponibilidad
+          </h2>
 
-          {selectedDate && !availabilityLoading && availableSlots.length > 0 && (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (selectedDate && selectedTime) {
-                  navigate(`/booking?date=${selectedDate}&time=${selectedTime}&specialist=${specialistId}`);
-                }
-              }}
-            >
-              <Input
-                id="date"
-                type="date"
-                label="Fecha"
-                value={selectedDate}
-                disabled
-                onChange={(event) => handleDateChange(event.target.value)}
-              />
-              <Input
-                id="time"
-                type="text"
-                label="Hora"
-                value={selectedTime}
-                disabled
-              />
-              <select
-                name="time"
-                value={selectedTime}
-                onChange={(event) => setSelectedTime(event.target.value)}
-                className="w-full rounded-2xl border border-dental-200 px-4 py-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-dental-500/20"
-              >
-                <option value="">Seleccionar hora</option>
-                {availableSlots.map((slot) => (
-                  <option key={slot.startsAt} value={slot.startsAt}>
-                    {slot.label}
-                  </option>
-                ))}
-              </select>
-              <Button variant="primary" type="submit" className="mt-4 w-full">
-                Confirmar Cita
-              </Button>
-            </form>
-          )}
+          <label htmlFor="detail-date" className="mt-5 block text-sm font-semibold text-slate-700">Fecha</label>
+          <input
+            id="detail-date"
+            type="date"
+            min={clinicToday()}
+            value={selectedDate}
+            onChange={(event) => { setSelectedDate(event.target.value); setSelectedSlot(''); }}
+            className="mt-1.5 min-h-[48px] w-full rounded-xl border border-slate-500 bg-white px-4 text-base text-slate-900 hover:border-dental-900 focus:border-dental-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-dental-800/30 sm:max-w-xs"
+          />
 
-          {!selectedDate && (
-            <p className="mt-4 text-dental-500 text-sm">
-              Seleccione una fecha para ver los horarios disponibles
-            </p>
-          )}
+          {!selectedDate && <p className="mt-4 text-sm text-slate-600">Elige una fecha para ver los horarios disponibles.</p>}
 
-          {!availabilityLoading && !availableSlots.length && (
-            <p className="mt-4 text-dental-500 text-sm">
-              No hay disponibilidad para la fecha seleccionada
-            </p>
-          )}
-        </Card>
-
-        {/* Appointments History */}
-        {appointments.length > 0 && (
-          <div className="mt-8">
-            <h4 className="text-dental-700 mb-4">Citas Previas</h4>
-            <div className="space-y-3">
-              {appointments.slice(0, 3).map((appt: import('../hooks/useAppointments').Appointment) => (
-                <div key={appt.id} className="p-3 bg-dental-50 rounded border border-dental-200">
-                  <p className="font-medium">
-                    {appt.date} a las {appt.time}
-                  </p>
-                  <p className="text-dental-500 text-sm">
-                    {appt.status}
-                  </p>
+          {selectedDate && (
+            <div className="mt-6">
+              <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700"><Clock3 className="h-4 w-4 text-dental-900" aria-hidden="true" /> Horarios disponibles</p>
+              {availabilityLoading ? (
+                <div role="status" className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <span className="sr-only">Buscando horarios...</span>
+                  {Array.from({ length: 4 }, (_, index) => <Loading.Skeleton key={index} className="h-11" />)}
                 </div>
-              ))}
+              ) : slots.length === 0 ? (
+                <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">No hay horarios para esa fecha. Prueba con otro día.</p>
+              ) : (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {slots.map((slot) => (
+                    <button
+                      key={slot.startsAt}
+                      type="button"
+                      aria-pressed={selectedSlot === slot.startsAt}
+                      onClick={() => setSelectedSlot(slot.startsAt)}
+                      className={`min-h-[44px] cursor-pointer rounded-xl border px-3 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dental-800 focus-visible:ring-offset-2 ${selectedSlot === slot.startsAt ? 'border-dental-800 bg-dental-800 text-white' : 'border-slate-400 bg-white text-slate-800 hover:border-dental-800 hover:bg-dental-50'}`}
+                    >
+                      {slot.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
+          )}
+
+          <div className="mt-8 flex justify-end">
+            <Button className="w-full sm:w-auto" disabled={!selectedSlot} onClick={goToBooking}>Continuar con la reserva</Button>
           </div>
-        )}
+        </Card>
       </div>
     </section>
   );

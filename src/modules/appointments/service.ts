@@ -1,5 +1,21 @@
 import { PrismaClient, AppointmentStatus, Prisma } from '@prisma/client'
 import { FastifyInstance } from 'fastify'
+import { assertBookableWindow } from '../../utils/slots.js'
+
+const TERMINAL_STATUSES: AppointmentStatus[] = ['CANCELADO', 'FINALIZADO', 'NO_ASISTIO']
+
+/** True when the error is the DB exclusion-constraint (double booking) violation */
+function isSlotConflictError(err: unknown): boolean {
+  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    // P2003/P2000 kept from the original create() mapping; 23P01 = exclusion violation
+    return err.code === 'P2003' || err.code === 'P2000' || err.code === '23P01' || (err.message ?? '').includes('23P01')
+  }
+  if (err instanceof Prisma.PrismaClientUnknownRequestError) {
+    const m = err.message || ''
+    return m.includes('23P01') || m.includes('exclusion constraint')
+  }
+  return false
+}
 
 export class AppointmentService {
   constructor(private prisma: PrismaClient, private fastify: FastifyInstance) {}
@@ -29,6 +45,9 @@ export class AppointmentService {
       throw new Error('SPECIALTY_MISMATCH')
     }
 
+    // Server-side validation: future, ordered, inside availability, not blocked
+    await assertBookableWindow(this.prisma, data.specialistId, data.startsAt, data.endsAt)
+
     // Resolver paciente:
     // - Autenticado -> SIEMPRE su propia cuenta (el teléfono es solo contacto)
     // - Anónimo (web pública) -> buscar/crear por teléfono
@@ -39,14 +58,19 @@ export class AppointmentService {
         throw new Error('PATIENT_NOT_FOUND')
       }
     } else {
+      // SECURITY: anonymous input never modifies an existing user (no email overwrite)
       patient = await this.prisma.user.findFirst({
         where: { phone: data.patientPhone, role: 'PATIENT' },
       })
 
       if (!patient) {
+        const placeholder = `patient-${data.patientPhone}@dental.local`
+        const emailTaken = data.patientEmail
+          ? await this.prisma.user.findUnique({ where: { email: data.patientEmail }, select: { id: true } })
+          : null
         patient = await this.prisma.user.create({
           data: {
-            email: data.patientEmail || `patient-${data.patientPhone}@dental.local`,
+            email: data.patientEmail && !emailTaken ? data.patientEmail : placeholder,
             passwordHash: '',
             fullName: data.patientName,
             phone: data.patientPhone,
@@ -54,8 +78,6 @@ export class AppointmentService {
             isActive: true,
           },
         })
-      } else if (data.patientEmail && patient.email !== data.patientEmail) {
-        await this.prisma.user.update({ where: { id: patient.id }, data: { email: data.patientEmail } })
       }
     }
 
@@ -82,19 +104,7 @@ export class AppointmentService {
       await this.logAudit(appointment.id, 'CREATED', null, 'PENDIENTE', data.createdById, { source: data.source })
       return appointment
     } catch (err) {
-      // Handle Prisma errors - check both known and unknown request errors
-      if (err instanceof Prisma.PrismaClientKnownRequestError) {
-        // P2003 = foreign key constraint, P2000 = constraint violation, 23P01 = exclusion constraint violation
-        if (err.code === 'P2003' || err.code === 'P2000' || err.code === '23P01') {
-          throw new Error('SLOT_CONFLICT')
-        }
-      } else if (err instanceof Prisma.PrismaClientUnknownRequestError) {
-        // Check if the underlying error is an exclusion constraint violation (23P01)
-        const errorMessage = err.message || ''
-        if (errorMessage.includes('23P01') || errorMessage.includes('exclusion constraint')) {
-          throw new Error('SLOT_CONFLICT')
-        }
-      }
+      if (isSlotConflictError(err)) throw new Error('SLOT_CONFLICT')
       throw err
     }
   }
@@ -116,6 +126,13 @@ export class AppointmentService {
 
     // Si se mueve la cita, verificar disponibilidad (excluyendo la propia cita)
     if (data.startsAt || data.endsAt) {
+      if (TERMINAL_STATUSES.includes(existing.status)) throw new Error('APPOINTMENT_NOT_RESCHEDULABLE')
+      await assertBookableWindow(
+        this.prisma,
+        existing.specialistId,
+        data.startsAt ?? existing.startsAt,
+        data.endsAt ?? existing.endsAt
+      )
       const conflict = await this.prisma.appointment.findFirst({
         where: {
           specialistId: existing.specialistId,
@@ -130,14 +147,20 @@ export class AppointmentService {
       if (conflict) throw new Error('SLOT_CONFLICT')
     }
 
-    const updated = await this.prisma.appointment.update({
-      where: { id },
-      data: { ...data, version: { increment: 1 } },
-      include: {
-        specialist: { include: { user: { select: { fullName: true } } } },
-        patient: { select: { fullName: true, phone: true, email: true } },
-      },
-    })
+    let updated
+    try {
+      updated = await this.prisma.appointment.update({
+        where: { id },
+        data: { ...data, version: { increment: 1 } },
+        include: {
+          specialist: { include: { user: { select: { fullName: true } } } },
+          patient: { select: { fullName: true, phone: true, email: true } },
+        },
+      })
+    } catch (err) {
+      if (isSlotConflictError(err)) throw new Error('SLOT_CONFLICT')
+      throw err
+    }
 
     if (data.status && data.status !== existing.status) {
       await this.logAudit(id, 'STATUS_CHANGED', existing.status, data.status, changedById, {

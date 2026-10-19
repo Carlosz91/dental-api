@@ -1,60 +1,45 @@
 import React from 'react';
 
 /**
- * Dental-styled button component with 4 variants:
- * - primary: Blue CTA button
+ * Dental-styled button component with variants:
+ * - primary: Solid blue CTA (white text, AA contrast)
  * - secondary: Light blue button with border
- * - outline: Transparent background with blue border
- * - ghost: Fully transparent with blue text
+ * - outline: White background with blue border
+ * - ghost: Transparent with blue text
+ * - accent: Bright cyan CTA for use on dark backgrounds
+ * - danger: Destructive action (e.g. cancel an appointment)
  *
- * Accessible: focus-visible styles, proper contrast, disabled state
+ * Accessible: visible focus ring, 44px minimum touch target, AA contrast, disabled state.
  */
 type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'accent' | 'danger';
   size?: 'sm' | 'md' | 'lg';
 };
 
+const baseClasses =
+  'inline-flex max-w-full cursor-pointer items-center justify-center gap-2 rounded-lg font-semibold shadow-sm transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dental-800 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none';
+
+const sizeClasses = {
+  sm: 'min-h-[44px] px-3 py-2 text-sm',
+  md: 'min-h-[44px] px-4 py-2.5 text-sm',
+  lg: 'min-h-[48px] px-6 py-3 text-base',
+};
+
+const variantClasses = {
+  primary: 'bg-dental-800 text-white hover:bg-dental-900 active:bg-dental-900',
+  secondary: 'border border-dental-300 bg-dental-50 text-dental-900 hover:bg-dental-100 active:bg-dental-200',
+  outline: 'border border-dental-800 bg-white text-dental-900 hover:bg-dental-50 active:bg-dental-100',
+  ghost: 'bg-transparent text-dental-900 shadow-none hover:bg-dental-100 active:bg-dental-200',
+  accent: 'bg-cyan-300 text-slate-950 hover:bg-cyan-200 active:bg-cyan-200 focus-visible:ring-white focus-visible:ring-offset-slate-900',
+  danger: 'bg-red-700 text-white hover:bg-red-800 active:bg-red-800 focus-visible:ring-red-700',
+};
+
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({
-    className,
-    variant = 'primary',
-    size = 'md',
-    children,
-    disabled,
-    ...props
-  }, ref) => {
-    const baseClasses = 'inline-flex !w-fit max-w-full cursor-pointer items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold shadow-sm transition-all duration-200 ease-out hover:shadow-md active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dental-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed';
-
-    const sizeClasses = {
-      sm: 'px-2.5 py-1.5 text-xs gap-1.5',
-      md: 'px-3 py-2 text-xs sm:px-4 sm:py-2.5 sm:text-sm',
-      lg: 'px-4 py-3 text-sm sm:px-6 sm:py-3 sm:text-base',
-    };
-
-    let buttonClasses = '';
-    switch (variant) {
-      case 'primary':
-        buttonClasses = `${baseClasses} ${sizeClasses[size]} bg-dental-600 text-white shadow-sm hover:bg-dental-700 hover:-translate-y-0.5 active:bg-dental-800 active:translate-y-0`;
-        break;
-      case 'secondary':
-        buttonClasses = `${baseClasses} ${sizeClasses[size]} bg-dental-50 text-dental-700 border border-dental-200 shadow-sm hover:bg-dental-100 hover:border-dental-300 hover:-translate-y-0.5 active:bg-dental-200 active:translate-y-0`;
-        break;
-      case 'outline':
-        buttonClasses = `${baseClasses} ${sizeClasses[size]} bg-white text-dental-700 border border-dental-300 hover:bg-dental-50 hover:border-dental-500 hover:-translate-y-0.5 active:bg-dental-100 active:translate-y-0`;
-        break;
-      case 'ghost':
-        buttonClasses = `${baseClasses} ${sizeClasses[size]} bg-transparent text-dental-600 hover:bg-dental-100 hover:-translate-y-0.5 active:bg-dental-200 active:translate-y-0`;
-        break;
-    }
-
+  ({ className, variant = 'primary', size = 'md', type = 'button', children, ...props }, ref) => {
     return (
       <button
-        className={`
-            ${buttonClasses} shadow-sm
-          ${disabled ? 'opacity-50 cursor-not-allowed disabled:shadow-none' : ''}
-          ${className || ''}
-        `}
-        disabled={disabled}
+        type={type}
+        className={`${baseClasses} ${sizeClasses[size]} ${variantClasses[variant]} ${className || ''}`}
         ref={ref}
         {...props}
       >

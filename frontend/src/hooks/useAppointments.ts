@@ -17,6 +17,11 @@ const artTime = new Intl.DateTimeFormat('es-AR', {
   hour12: false,
 });
 
+/** Today's date (YYYY-MM-DD) in the clinic timezone, for `min` on date inputs */
+export function clinicToday(): string {
+  return artDate.format(new Date());
+}
+
 /** Buckets the backend statuses into the three UI states */
 function mapStatus(status: string): Appointment['status'] {
   if (status === 'CANCELADO') return 'cancelada';
@@ -37,6 +42,8 @@ export interface Appointment {
   /** HH:mm in clinic tz */
   time: string;
   status: 'agendada' | 'cancelada' | 'finalizada';
+  /** Backend status (PENDIENTE, CONFIRMADO, EN_CURSO, ...) for precise labels */
+  rawStatus: string;
 }
 
 interface ApiAppointment {
@@ -62,6 +69,7 @@ function mapApiAppointment(raw: ApiAppointment): Appointment {
     date: artDate.format(start),
     time: artTime.format(start),
     status: mapStatus(raw.status),
+    rawStatus: raw.status,
   };
 }
 
@@ -82,15 +90,15 @@ export interface CreateAppointmentInput {
 }
 
 const exampleAppointments: Appointment[] = [
-  { id: 'demo-appointment-1', patientName: 'Paciente demo', specialistId: 'demo-estetica', startsAt: '', endsAt: '', date: '2026-09-05', time: '10:30', status: 'agendada' },
-  { id: 'demo-appointment-2', patientName: 'Paciente demo', specialistId: 'demo-ortodoncia', startsAt: '', endsAt: '', date: '2026-08-18', time: '16:00', status: 'cancelada' },
+  { id: 'demo-appointment-1', patientName: 'Paciente demo', specialistId: 'demo-estetica', startsAt: '', endsAt: '', date: '2026-09-05', time: '10:30', status: 'agendada', rawStatus: 'CONFIRMADO' },
+  { id: 'demo-appointment-2', patientName: 'Paciente demo', specialistId: 'demo-ortodoncia', startsAt: '', endsAt: '', date: '2026-08-18', time: '16:00', status: 'cancelada', rawStatus: 'CANCELADO' },
 ];
 
 export const useAppointments = (_userId?: string) => {
   const queryClient = useQueryClient();
   const key = ['appointments', _userId ?? 'anonymous'];
 
-  const { data: appointments = [], isLoading } = useQuery({
+  const { data: appointments = [], isLoading, isError: isLoadError, refetch } = useQuery({
     queryKey: key,
     queryFn: async () => {
       if (isDemoMode) {
@@ -167,6 +175,8 @@ export const useAppointments = (_userId?: string) => {
   return {
     appointments,
     isLoading,
+    isLoadError,
+    refetch,
     createAppointment: createMutation.mutateAsync,
     cancelAppointment: cancelMutation.mutateAsync,
     rescheduleAppointment: rescheduleMutation.mutateAsync,
